@@ -119,6 +119,16 @@ input.code{font-size:28px;letter-spacing:6px;text-align:center;text-transform:up
 .wait{text-align:center;padding:10px;font-weight:800}
 .spin{display:inline-block;animation:spin 1.2s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px}
+.stats div{background:var(--night);color:#fff;border-radius:16px;padding:10px 4px;text-align:center}
+.stats b{display:block;font-size:20px;font-weight:900;line-height:1.1}
+.stats span{font-size:11px;font-weight:700;opacity:.8}
+.card.hist{padding:12px 14px}
+.card.hist.won{background:linear-gradient(135deg,#FFF3B0,#FFD86B);box-shadow:0 4px 0 #D9A420;border:2px solid #F2C14E}
+.hist-head{display:flex;justify-content:space-between;align-items:center;font-weight:900;margin-bottom:6px}
+.hist-date{font-size:11px;font-weight:700;color:var(--night-soft)}
+.hist-row{display:flex;justify-content:space-between;padding:4px 0;font-weight:700;font-size:14px;border-top:1px dashed rgba(0,0,0,.08)}
+.hist-row.me{font-weight:900;background:rgba(255,255,255,.45);border-radius:8px;padding:4px 6px}
 .toggle{display:flex;gap:6px}.toggle button{flex:1;padding:10px;border-radius:12px;background:#EFE3C6}.toggle button.sel{background:var(--night);color:#fff}
 </style>
 </head>
@@ -403,7 +413,7 @@ const isMyTurn = () => !isWorld() || currentPlayer(ui.game)?.clientId===ui.clien
 function render(){
   let html = '';
   const v = { home:viewHome, count:viewCount, names:viewNames, pass:viewPass, game:viewGame, result:viewResult, howto:viewHowto, settings:viewSettings,
-    world:viewWorld, lobby:viewLobby }[ui.screen];
+    world:viewWorld, lobby:viewLobby, history:viewHistory }[ui.screen];
   html = v();
   if (ui.overlay) html += ui.overlay;
   if (ui.tip) html += `<div class="overlay" onclick="closeTip()"><div class="sheet" onclick="event.stopPropagation()"><h3>💡 ${TIPS[ui.tip][0]}</h3><p>${TIPS[ui.tip][1]}</p><button class="btn light center" onclick="closeTip()">알겠어요</button></div></div>`;
@@ -422,6 +432,7 @@ function viewHome(){
     <div class="hero">${cams}</div>
     <button class="btn" onclick="ui.mode='local';go('count')">로컬 게임<small>한 기기로 함께 플레이 (2~6명)</small></button>
     <button class="btn" style="background:var(--night-soft);box-shadow:0 6px 0 #3B2A6A" onclick="ui.mode='world';go('world')">월드 게임<small>각자의 기기로 · 방 코드로 참가 (2~6명)</small></button>
+    <button class="btn light" onclick="openHistory()">📜 나의 전적 보기<small>1등 횟수 · 승률 · 최대 코인 · 지난 판 기록</small></button>
     <button class="btn light" onclick="go('howto')">게임 방법</button>
     <button class="btn light" onclick="go('settings')">설정 · 규칙 값 · 엔진 테스트</button>
   </div>`;
@@ -442,7 +453,7 @@ function viewNames(){
 window.startLocalGame = ()=>{
   let players = ui.names.map((n,i)=>({name:n.trim()||`플레이어 ${i+1}`}));
   if (GAME_RULES.RANDOM_TURN_ORDER) players = shuffle(players);
-  ui.game = createGame(players); ui.pendingResult=null; ui.picking=null; ui.camelXY=null;
+  ui.game = createGame(players); ui.game.gameId='L-'+Date.now(); ui.pendingResult=null; ui.picking=null; ui.camelXY=null;
   ui.overlay = orderOverlay(ui.game, "ui.overlay=null;go('pass')"); ui.screen='game'; render();
 };
 /* 오버레이 큐: 순서 → 구간 종료 → 내 차례 처럼 여러 안내가 겹칠 때 하나씩 보여준다 */
@@ -645,7 +656,7 @@ window.pickSpace = pos=>{ const side=ui.picking.side; actionPlaceTile(ui.game,po
 function legOverlayHtml(g, res, next){ return legNoticeHtml(makeLegNotice(g,res), 'ui.overlay=null;'+next); }
 window.finishTurn = ()=>{   // 로컬 모드
   const g=ui.game, res=endTurn(g); ui.pendingResult=null;
-  if (res.gameEnded){ ui.result=res; ui.screen='result'; render(); return; }
+  if (res.gameEnded){ ui.result=res; ui.screen='result'; recordGame(g,res); render(); return; }
   if (res.legEnded){ ui.overlay=legOverlayHtml(g,res,"go('pass')"); render(); return; }
   ui.screen='pass'; render();
 };
@@ -724,7 +735,7 @@ function applyRoom(room){
   ui.room=room; ui.lastSync=Date.now();
   if (room.status==='lobby'){ ui.screen='lobby'; ui.game=null; return; }
   ui.game=room.game;
-  if (room.status==='finished'){ ui.result=room.result; ui.screen='result'; return; }
+  if (room.status==='finished'){ ui.result=room.result; ui.screen='result'; recordGame(room.game, room.result); return; }
   if (ui.screen!=='game'){ ui.screen='game'; if (room.game.log.length===0) queueOverlay(orderOverlay(room.game,'nextOverlay()')); }
   // 구간 종료 안내: 마지막 주사위를 뽑은 사람뿐 아니라 모든 기기에서 한 번씩
   if (room.legNotice && room.legNotice.leg!==ui.shownLegNotice){ ui.shownLegNotice=room.legNotice.leg; queueOverlay(legNoticeHtml(room.legNotice,'nextOverlay()')); }
@@ -807,7 +818,7 @@ window.hostStart = async ()=>{
   const okk = await commit(r=>{
     let ps = r.players.map(p=>({name:p.name, clientId:p.clientId}));
     if (GAME_RULES.RANDOM_TURN_ORDER) ps = shuffle(ps);
-    r.game = createGame(ps); r.status='playing'; r.lastEvent=''; r.legNotice=null;
+    r.game = createGame(ps); r.game.gameId=r.code+'-'+Date.now(); r.status='playing'; r.lastEvent=''; r.legNotice=null;
   });
   if (okk) applyRoom(ui.room); else ui.err='다른 갱신이 있어 다시 불러왔어요. 한 번 더 눌러주세요.';
   render();
@@ -830,7 +841,7 @@ async function worldCommitTurn(publicHtml){
     ui.syncErr='업로드 실패, 다시 시도 중… ('+(e.message||'')+')'; patchSyncText(); setTimeout(()=>retrySave(res), 3000); return;
   }
   ui.committing=false; ui.pendingResult=null;
-  if (res.gameEnded){ ui.result=res; ui.screen='result'; render(); return; }
+  if (res.gameEnded){ ui.result=res; ui.screen='result'; recordGame(g,res); render(); return; }
   if (res.legEnded){ queueOverlay(legNoticeHtml(ui.room.legNotice,'nextOverlay()')); }
   const turnKey = g.currentLeg+'-'+g.log.length+'-'+g.currentPlayerIndex;   // 2인전 등 곧바로 내 차례가 다시 올 때
   if (isMyTurn() && ui.lastTurnKey!==turnKey){ ui.lastTurnKey=turnKey; queueOverlay(turnOverlay(g)); }
@@ -839,8 +850,59 @@ async function worldCommitTurn(publicHtml){
 async function retrySave(res){
   try { await saveRoom(ui.room); } catch(e){ setTimeout(()=>retrySave(res), 3000); return; }
   ui.committing=false; ui.pendingResult=null; ui.syncErr='';
-  if (res.gameEnded){ ui.result=res; ui.screen='result'; } else if (res.legEnded){ queueOverlay(legNoticeHtml(ui.room.legNotice,'nextOverlay()')); }
+  if (res.gameEnded){ ui.result=res; ui.screen='result'; recordGame(ui.game,res); } else if (res.legEnded){ queueOverlay(legNoticeHtml(ui.room.legNotice,'nextOverlay()')); }
   render();
+}
+/* =====================================================================
+   7. 나의 전적 — 개인 저장소(window.storage, shared=false)에 계정별로 기록
+      · 한 키('history')에 전체 기록을 묶어 저장 (요청 횟수 최소화)
+      · 월드 게임만 승률 통계에 포함: 로컬 게임은 한 기기를 여러 명이 쓰므로 '나'를 특정할 수 없음 (OPEN-005)
+   ===================================================================== */
+const HISTORY_MAX = 200;
+async function loadHistory(){ try{ const r=await window.storage.get('history',false); return JSON.parse(r.value); }catch{ return {games:[]}; } }
+function buildRecord(g, res){
+  const players = res.final.standings.map((p,i)=>({ name:p.name, coins:p.coins, rank:i+1, clientId:p.clientId||null }));
+  const me = g.players.some(p=>p.clientId) ? players.find(p=>p.clientId===ui.clientId) : null;
+  return { id:g.gameId||('G-'+Date.now()), ts:Date.now(), mode: me?'world':'local', players,
+    myName: me?.name ?? null, myRank: me?.rank ?? null, won: !!me && me.rank===1, myCoins: me?.coins ?? null };
+}
+ui.recordedIds = new Set();
+async function recordGame(g, res){
+  if (!hasStorage() || !res?.final) return;
+  const rec = buildRecord(g, res);
+  if (ui.recordedIds.has(rec.id)) return; ui.recordedIds.add(rec.id);
+  try {
+    const h = await loadHistory();
+    if (h.games.some(x=>x.id===rec.id)) return;
+    h.games.unshift(rec); h.games = h.games.slice(0, HISTORY_MAX);
+    await window.storage.set('history', JSON.stringify(h), false);
+  } catch(e){ console.warn('전적 저장 실패', e); }
+}
+function historyStats(games){
+  const mine = games.filter(x=>x.mode==='world' && x.myRank);
+  const wins = mine.filter(x=>x.won);
+  return { total:mine.length, wins:wins.length, rate: mine.length? Math.round(wins.length/mine.length*100):0, maxCoins: wins.length? Math.max(...wins.map(x=>x.myCoins)):0 };
+}
+window.openHistory = async ()=>{
+  ui.screen='history'; ui.history=null; ui.overlay=null; stopPoll(); render();
+  if (!hasStorage()) { ui.history={games:[], unavailable:true}; render(); return; }
+  await getClientId(); ui.history = await loadHistory(); render();
+};
+function viewHistory(){
+  const h=ui.history;
+  if (!h) return `<h2>📜 나의 전적</h2><div class="card wait"><span class="spin">🔄</span> 불러오는 중…</div>`;
+  if (h.unavailable) return `<h2>📜 나의 전적</h2><div class="card"><b>이 화면에서는 전적을 저장할 수 없어요.</b><p style="font-weight:600;margin-top:6px;line-height:1.5">전적은 Claude 계정별 개인 저장소에 기록돼요. 게시(Publish)된 링크에서 열면 기록·조회가 됩니다.</p></div><button class="btn ghost" onclick="go('home')">← 메인으로</button>`;
+  const st=historyStats(h.games), medals=['🥇','🥈','🥉'];
+  const fmt=ts=>{ const d=new Date(ts); return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; };
+  const cards = h.games.map(x=>`<div class="card hist ${x.won?'won':''}">
+      <div class="hist-head"><span>${x.won?'🏆 1등!':x.myRank?medals[x.myRank-1]||x.myRank+'위':'📱 로컬'}</span><span class="hist-date">${fmt(x.ts)} · ${x.players.length}명${x.mode==='local'?' · 통계 제외':''}</span></div>
+      ${x.players.map(pl=>`<div class="hist-row ${pl.name===x.myName&&x.mode==='world'?'me':''}"><span>${medals[pl.rank-1]||pl.rank+'위'} ${esc(pl.name)}${pl.name===x.myName&&x.mode==='world'?' (나)':''}</span><span class="coin">💰 ${pl.coins}</span></div>`).join('')}
+    </div>`).join('');
+  return `<h2>📜 나의 전적</h2>
+    <div class="stats"><div><b>${st.wins}</b><span>1등 횟수</span></div><div><b>${st.total}</b><span>총 플레이</span></div><div><b>${st.rate}%</b><span>승률</span></div><div><b>💰${st.maxCoins}</b><span>최대 코인</span></div></div>
+    <p class="sub" style="font-size:12px">통계는 월드 게임 기준 · 최대 코인은 1등한 판에서 얻은 코인 중 최고값</p>
+    ${cards || '<div class="card wait">아직 기록이 없어요. 첫 판을 시작해 보세요! 🐪</div>'}
+    <button class="btn ghost" onclick="go('home')">← 메인으로</button>`;
 }
 window.addEventListener('beforeunload', stopPoll);
 /* iOS Safari는 viewport 설정을 무시하므로 핀치·더블탭 확대를 직접 막는다 (세로 스크롤은 유지) */
