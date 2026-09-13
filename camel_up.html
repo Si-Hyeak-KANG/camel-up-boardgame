@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>낙타 레이스 — Camel Up 2판 규칙</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;800;900&family=Gowun+Dodum&display=swap" rel="stylesheet">
+<style>
+:root{
+  --sand:#FBE7B5; --sand-deep:#F4C978; --night:#3B2A6A; --night-soft:#5A4691; --paper:#FFF8E8;
+  --ok:#3FA86B; --warn:#E05A5A;
+  --red:#FF6B6B; --blue:#4D8DFF; --green:#4CC46A; --yellow:#FFCF3F; --purple:#B07CFF; --black:#4A4A55; --white:#F4F1EA;
+  --radius:22px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;touch-action:pan-y;overscroll-behavior-y:none}
+body{-webkit-text-size-adjust:100%}
+input,textarea{font-size:16px}
+body{font-family:"Nunito","Gowun Dodum","Apple SD Gothic Neo","Noto Sans KR",sans-serif;color:var(--night);
+  background:radial-gradient(circle at 20% -10%,#FFF3D1 0,var(--sand) 45%,var(--sand-deep) 100%);min-height:100dvh;overflow-x:hidden}
+#app{max-width:480px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column;padding:14px 14px calc(160px + env(safe-area-inset-bottom))}
+h1{font-weight:900;font-size:36px;letter-spacing:-1px;line-height:1;text-align:center}
+h2{font-weight:900;font-size:24px;text-align:center;margin:6px 0 14px}
+p.sub{text-align:center;color:var(--night-soft);font-weight:600;margin-bottom:16px;line-height:1.5}
+button{font:inherit;cursor:pointer;border:0;font-weight:800;color:inherit}
+.btn{display:block;width:100%;padding:15px 18px;border-radius:var(--radius);background:var(--night);color:#fff;font-size:17px;
+  box-shadow:0 6px 0 #241850;transition:transform .08s,box-shadow .08s;margin-bottom:12px;text-align:left}
+.btn small{display:block;font-weight:600;font-size:13px;opacity:.8;margin-top:3px}
+.btn:active{transform:translateY(4px);box-shadow:0 2px 0 #241850}
+.btn.light{background:var(--paper);color:var(--night);box-shadow:0 6px 0 #E4CFA2}
+.btn.light:active{box-shadow:0 2px 0 #E4CFA2}
+.btn.ghost{background:transparent;box-shadow:none;color:var(--night-soft);text-align:center;padding:10px}
+.btn:disabled{opacity:.4;transform:none}
+.btn.center{text-align:center}
+.btn.sm{padding:10px 14px;font-size:14px;border-radius:14px;box-shadow:0 4px 0 #E4CFA2;margin:0}
+.row{display:flex;gap:10px}.row>*{flex:1}
+.pill{padding:14px 0;border-radius:18px;background:var(--paper);font-size:22px;font-weight:900;text-align:center;box-shadow:0 5px 0 #E4CFA2}
+.pill.sel{background:var(--night);color:#fff;box-shadow:0 5px 0 #241850}
+input{font:inherit;font-weight:700;width:100%;padding:14px 16px;border-radius:18px;border:3px solid transparent;background:var(--paper);color:var(--night);outline:0;margin-bottom:10px}
+input:focus{border-color:var(--night-soft)}
+input.code{font-size:28px;letter-spacing:6px;text-align:center;text-transform:uppercase;font-weight:900}
+.card{background:var(--paper);border-radius:var(--radius);padding:14px 16px;margin-bottom:12px;box-shadow:0 4px 0 #EAD6A8}
+.topbar{display:flex;align-items:center;justify-content:space-between;background:var(--paper);border-radius:18px;padding:8px 12px;margin-bottom:8px;font-weight:900;font-size:15px}
+.tipbtn{width:36px;height:36px;border-radius:50%;background:var(--sand-deep);font-size:18px}
+/* 플레이어 순서/코인 스트립 */
+.strip{display:flex;gap:6px;overflow-x:auto;padding:4px 2px 8px;margin-bottom:6px;scrollbar-width:none}
+.strip::-webkit-scrollbar{display:none}
+.seat{flex:0 0 auto;background:var(--paper);border-radius:14px;padding:6px 10px;font-size:12px;font-weight:800;border:3px solid transparent;min-width:72px;text-align:center;line-height:1.3}
+.seat.now{border-color:var(--night);background:#FFEAA8}
+.seat.me{box-shadow:0 0 0 2px #B07CFF inset}
+.seat .n{font-size:10px;color:var(--night-soft)}
+.seat .c{font-size:15px;color:#C98700;font-weight:900}
+/* 트랙 — 사각 둘레형(부루마블) 순환 트랙. 칸/낙타 좌표는 layoutTrack()이 컨테이너 너비로 계산 */
+.track{position:relative;background:#FFF1CF;border-radius:var(--radius);margin-bottom:10px;border:4px solid #F1D9A2;overflow:visible}
+.cell{position:absolute;border-radius:12px;background:#F8E2AE;border:2px solid #E9CD93;font-size:11px;font-weight:900;color:#B08A47;padding:3px 6px;line-height:1}
+.cell.corner{background:#F3D79A}
+.arrow{position:absolute;font-size:14px;color:#C9A45C;font-weight:900;line-height:1;pointer-events:none}
+.cell.tile-cheer,.cell.tile-boo{border-style:dashed;border-width:3px;border-color:var(--ok)}
+.cell.tile-boo{border-color:var(--warn)}
+.cell .tilelabel{position:absolute;top:calc(100% - 4px);left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:2px;font-size:10px;font-weight:900;color:#fff;
+  background:var(--ok);border-radius:999px;padding:2px 6px;line-height:1.2;white-space:nowrap;max-width:84px;overflow:hidden;text-overflow:ellipsis;z-index:5}
+.cell.tile-boo .tilelabel{background:var(--warn)}
+.cell .tilelabel em{font-style:normal;font-size:11px}
+.cell.pick{outline:3px solid var(--night);cursor:pointer;background:#FFEAA8;animation:pulse 1s infinite}
+@keyframes pulse{50%{outline-color:#B07CFF}}
+.zone{position:absolute;border-radius:14px;font-size:11px;font-weight:800;color:#B08A47;text-align:center;padding:3px 0}
+.zone.start{background:#F3D79A;border:2px dashed #C9A45C}
+.zone.fin{color:var(--night)}
+.finishline{position:absolute;background:repeating-linear-gradient(0deg,#3B2A6A 0 6px,#fff 6px 12px);border-radius:3px;z-index:2}
+.camels{position:absolute;inset:0;pointer-events:none;z-index:3}
+.camel{position:absolute;width:42px;height:31px;left:0;top:0;transition:transform .8s cubic-bezier(.35,1.35,.45,1);will-change:transform;filter:drop-shadow(0 2px 0 rgba(0,0,0,.18))}
+.camel svg{width:100%;height:100%;overflow:visible}
+.camel.flip svg{transform:scaleX(-1)}
+.camel .eye{transform-origin:center;transform-box:fill-box;animation:blink 4s infinite}
+.camel.moving svg{animation:hop .35s ease-in-out 3}
+@keyframes blink{0%,92%,100%{transform:scaleY(1)}96%{transform:scaleY(.1)}}
+@keyframes hop{50%{transform:translateY(-7px)}}
+.camel.flip.moving svg{animation:hopflip .35s ease-in-out 3}
+@keyframes hopflip{0%,100%{transform:scaleX(-1)}50%{transform:scaleX(-1) translateY(-7px)}}
+@media (prefers-reduced-motion:reduce){.camel{transition:none}.camel svg,.camel .eye{animation:none!important}}
+/* 순위, 주사위 */
+.rank{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.dot{display:inline-block;width:18px;height:18px;border-radius:50%;vertical-align:-3px;border:2px solid rgba(0,0,0,.15)}
+.chip{display:inline-flex;align-items:center;gap:5px;background:#fff;border-radius:999px;padding:4px 10px;font-weight:800;font-size:13px}
+.dice{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
+.die{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-weight:900;font-size:18px;color:#fff;border:2px solid rgba(0,0,0,.15)}
+.die.unused{opacity:.3;font-size:0}
+.pyramid{text-align:center;margin:8px 0}
+.pyramid.shake{animation:shake .6s ease-in-out 2}
+@keyframes shake{0%,100%{transform:rotate(0)}25%{transform:rotate(-12deg) translateY(-6px)}75%{transform:rotate(12deg) translateY(-6px)}}
+.reveal{animation:pop .5s cubic-bezier(.3,1.6,.5,1)}
+@keyframes pop{from{transform:scale(0);opacity:0}}
+/* 오버레이 */
+.overlay{position:fixed;inset:0;background:rgba(59,42,106,.55);display:flex;align-items:flex-end;justify-content:center;z-index:20;padding:12px}
+.sheet{width:100%;max-width:480px;background:var(--paper);border-radius:28px;padding:20px;max-height:85dvh;overflow:auto;animation:up .3s cubic-bezier(.3,1.3,.5,1)}
+@keyframes up{from{transform:translateY(40px);opacity:0}}
+.sheet h3{font-size:20px;font-weight:900;margin-bottom:10px}
+.sheet p{font-weight:600;line-height:1.5;margin-bottom:10px}
+.pass{flex:1;display:flex;flex-direction:column;justify-content:center;text-align:center}
+.pass .big{font-size:80px;margin-bottom:10px}
+.coin{color:#C98700;font-weight:900}
+.log{font-size:13px;font-weight:700;color:var(--night-soft);max-height:70px;overflow:auto;line-height:1.5}
+.tag{font-size:11px;padding:2px 8px;border-radius:999px;background:var(--sand-deep);font-weight:800}
+.bets{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.betbtn{padding:8px 2px 6px;border-radius:14px;color:#fff;font-weight:900;font-size:12px;text-align:center;border:3px solid rgba(0,0,0,.12)}
+.betbtn svg{width:40px;height:30px;overflow:visible;display:block;margin:0 auto 2px}
+.betbtn small{display:block;font-size:11px;font-weight:800}
+.betbtn:disabled{opacity:.3}
+.hero{position:relative;height:160px;margin:6px 0 16px}
+.hero .camel{width:96px;height:72px;animation:idle 2.2s ease-in-out infinite;transition:none}
+@keyframes idle{50%{margin-top:-8px}}
+.testline{font-size:13px;font-weight:700;padding:4px 0;border-bottom:1px dashed #EAD6A8}
+.ok{color:var(--ok)}.bad{color:var(--warn)}
+.name{font-weight:900}
+.mine{border:3px solid var(--night)}
+.codebox{font-size:44px;font-weight:900;letter-spacing:8px;text-align:center;background:var(--night);color:#fff;border-radius:var(--radius);padding:14px;margin-bottom:10px}
+.lobby-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px dashed #EAD6A8;font-weight:800}
+.sync{font-size:12px;color:var(--night-soft);font-weight:700;text-align:center;margin-bottom:8px}
+.wait{text-align:center;padding:10px;font-weight:800}
+.spin{display:inline-block;animation:spin 1.2s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.toggle{display:flex;gap:6px}.toggle button{flex:1;padding:10px;border-radius:12px;background:#EFE3C6}.toggle button.sel{background:var(--night);color:#fff}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+/* =====================================================================
+   1. 규칙 설정 — 게임 규칙(GAME_RULES)과 인원별 설정 분리. 하드코딩 금지 영역.
+   ===================================================================== */
+const GAME_RULES = {
+  EDITION: 'Camel Up 2nd Edition (2018)',
+  TRACK_LENGTH: 16,
+  RACING_CAMELS: ['red','blue','green','yellow','purple'],
+  CRAZY_CAMELS: ['black','white'],
+  DIE_FACES: [1,2,3],
+  // ADR-003(사용자 결정): 피라미드의 주사위 6개를 모두 공개해야 구간 종료. 공식 2판은 5개 공개(1개 남김). 설정에서 전환.
+  DICE_DRAWN_PER_LEG: 6,
+  PYRAMID_TICKET_COIN: 1,
+  LEG_BET_TICKETS: [5,3,2,2],
+  LEG_BET_SECOND_PLACE: 1,
+  LEG_BET_WRONG: -1,
+  FINAL_BET_PAYOUT: [8,5,3,2,1,1,1,1],
+  FINAL_BET_WRONG: -1,
+  SPECTATOR_TILE_COIN: 1,
+  SPECTATOR_TILE_FORBIDDEN: [1],
+  SPECTATOR_TILE_NO_ADJACENT: true,
+  MIN_COINS: 0,
+  // ADR-001(사용자 결정): 'start' = 모든 낙타가 출발 구역(0번, 트랙 밖)에 나란히 대기. 겹치지 않음.
+  //   출발 구역에서는 스택이 없고, 첫 이동 시 일반 낙타는 1~3번, 미친 낙타는 뒤로 돌아 16~14번으로 진입.
+  //   공식 규칙은 'dice'(주사위로 1~3 / 16~14에 미리 배치). 설정 화면에서 전환 가능.
+  SETUP_MODE: 'start',
+  START_ZONE: 0,                      // 출발 구역 번호
+  CRAZY_WRAP: true,                   // 미친 낙타가 출발선을 뒤로 넘으면 16번으로 이어짐 (OPEN-002)
+  RANDOM_TURN_ORDER: true,
+};
+const PLAYER_COUNT_CONFIG = {
+  2: { startCoins: 3, finalCardsPerPlayer: 5, spectatorTilesPerPlayer: 1, official: false, note: '공식 규칙은 3~8인. 2인은 비공식 설정(OPEN-001).' },
+  3: { startCoins: 3, finalCardsPerPlayer: 5, spectatorTilesPerPlayer: 1, official: true },
+  4: { startCoins: 3, finalCardsPerPlayer: 5, spectatorTilesPerPlayer: 1, official: true },
+  5: { startCoins: 3, finalCardsPerPlayer: 5, spectatorTilesPerPlayer: 1, official: true },
+  6: { startCoins: 3, finalCardsPerPlayer: 5, spectatorTilesPerPlayer: 1, official: true },
+};
+const CAMEL_INFO = {
+  red:{name:'빨강',css:'#FF6B6B',dark:'#C64545'}, blue:{name:'파랑',css:'#4D8DFF',dark:'#2F62C4'}, green:{name:'초록',css:'#4CC46A',dark:'#2E8F49'},
+  yellow:{name:'노랑',css:'#FFCF3F',dark:'#C99A12'}, purple:{name:'보라',css:'#B07CFF',dark:'#7E52C9'},
+  black:{name:'검정(미친)',css:'#4A4A55',dark:'#222'}, white:{name:'하양(미친)',css:'#F4F1EA',dark:'#9A948A'},
+};
+
+/* =====================================================================
+   2. 게임 엔진 — UI와 분리된 순수 함수. rng 주입 가능(테스트/서버 재사용).
+   ===================================================================== */
+const isCrazy = c => GAME_RULES.CRAZY_CAMELS.includes(c);
+/** 기본 난수: 암호학적 난수(crypto) 기반 0~1. 테스트/서버에서는 rng를 주입해 대체 */
+const secureRandom = () => (typeof crypto!=='undefined' && crypto.getRandomValues) ? crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296 : Math.random();
+const rollDie = rng => GAME_RULES.DIE_FACES[Math.floor(rng()*GAME_RULES.DIE_FACES.length)];
+function shuffle(arr, rng=secureRandom){ const a=[...arr]; for(let i=a.length-1;i>0;i--){ const j=Math.floor(rng()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+function createGame(players, rng = secureRandom) {
+  // players: [{name, clientId?}] — 이미 턴 순서대로 정렬된 상태로 전달
+  const cfg = PLAYER_COUNT_CONFIG[players.length];
+  if (!cfg) throw new Error('지원하지 않는 인원: ' + players.length);
+  const s = {
+    playerCount:players.length, config:cfg,
+    players: players.map((p,id)=>({ id, name:p.name, clientId:p.clientId||null, coins:cfg.startCoins, finalCards:[...GAME_RULES.RACING_CAMELS], pyramidTickets:0 })),
+    currentPlayerIndex:0, currentLeg:1, status:'playing', winner:null,
+    stacks:{}, spectatorTiles:{},
+    dicePool:[...GAME_RULES.RACING_CAMELS,'grey'], usedDice:[],
+    legTickets:Object.fromEntries(GAME_RULES.RACING_CAMELS.map(c=>[c,[...GAME_RULES.LEG_BET_TICKETS]])),
+    legBets:[], finalBets:{winner:[],loser:[]}, log:[],
+  };
+  if (GAME_RULES.SETUP_MODE === 'dice') {
+    for (const c of GAME_RULES.RACING_CAMELS) place(s, c, rollDie(rng));
+    for (const c of GAME_RULES.CRAZY_CAMELS) place(s, c, GAME_RULES.TRACK_LENGTH + 1 - rollDie(rng));
+  } else {
+    // 출발 구역: 순서만 무작위(동점 시 순위용), 화면에는 나란히 표시
+    for (const c of shuffle([...GAME_RULES.RACING_CAMELS, ...GAME_RULES.CRAZY_CAMELS], rng)) place(s, c, GAME_RULES.START_ZONE);
+  }
+  return s;
+}
+function place(s, color, pos, under=false){ const st = s.stacks[pos] || (s.stacks[pos]=[]); under ? st.unshift(color) : st.push(color); }
+function locate(s, color){ for (const p in s.stacks){ const i=s.stacks[p].indexOf(color); if(i>=0) return {pos:+p, idx:i}; } return null; }
+const currentPlayer = s => s.players[s.currentPlayerIndex];
+const addCoins = (p, n) => { p.coins = Math.max(GAME_RULES.MIN_COINS, p.coins + n); };
+
+/** 낙타 이동: 이동 낙타 + 그 위의 모든 낙타가 함께 이동. 관중 타일 효과 포함. */
+function moveCamel(s, color, steps){
+  const dir = isCrazy(color) ? -1 : 1, ev = [];
+  const {pos, idx} = locate(s, color);
+  const atStart = pos === GAME_RULES.START_ZONE;
+  // 출발 구역에서는 스택이 없다 → 이동하는 낙타 한 마리만 나간다
+  const moving = atStart ? s.stacks[pos].splice(idx, 1) : s.stacks[pos].splice(idx);
+  if (!s.stacks[pos].length) delete s.stacks[pos];
+  // 미친 낙타는 출발선 바로 뒤가 16번 칸: 출발 구역을 17번으로 보고 뒤로 센다
+  const base = (isCrazy(color) && atStart) ? GAME_RULES.TRACK_LENGTH + 1 : pos;
+  let target = base + steps*dir, under = false;
+  target = wrapCrazy(color, target);
+  const tile = target <= GAME_RULES.TRACK_LENGTH ? s.spectatorTiles[target] : null;
+  if (tile){
+    addCoins(s.players[tile.owner], GAME_RULES.SPECTATOR_TILE_COIN);
+    ev.push({type:'tile', side:tile.side, owner:tile.owner, at:target});
+    if (tile.side==='cheer') target += dir; else { target -= dir; under = true; }
+    target = wrapCrazy(color, target);
+  }
+  const existing = s.stacks[target] || [];
+  s.stacks[target] = under ? [...moving, ...existing] : [...existing, ...moving];
+  ev.push({type:'move', color, moving:[...moving], from:pos, to:target, under});
+  return ev;
+}
+/** 미친 낙타가 1번 칸보다 뒤로 가면 16번으로 이어진다 (CRAZY_WRAP=false면 1번에서 멈춤) */
+function wrapCrazy(color, target){
+  if (!isCrazy(color) || target >= 1) return target;
+  return GAME_RULES.CRAZY_WRAP ? target + GAME_RULES.TRACK_LENGTH : 1;
+}
+function resolveCrazyMover(s, dieColor){  // OPEN-004
+  const carrying = GAME_RULES.CRAZY_CAMELS.filter(c=>{ const l=locate(s,c); const above=s.stacks[l.pos][l.idx+1]; return above && !isCrazy(above); });
+  return carrying.length===1 ? carrying[0] : dieColor;
+}
+function ranking(s){
+  return GAME_RULES.RACING_CAMELS.map(c=>({color:c, ...locate(s,c)})).sort((a,b)=> b.pos-a.pos || b.idx-a.idx).map(x=>x.color);
+}
+const isFinished = s => GAME_RULES.RACING_CAMELS.some(c=>locate(s,c).pos > GAME_RULES.TRACK_LENGTH);
+
+function actionDrawDie(s, rng=secureRandom){
+  const i = Math.floor(rng()*s.dicePool.length);
+  const dieColor = s.dicePool.splice(i,1)[0];
+  const value = rollDie(rng);
+  let camel = dieColor, crazyFace = null;
+  if (dieColor==='grey'){ crazyFace = GAME_RULES.CRAZY_CAMELS[Math.floor(rng()*GAME_RULES.CRAZY_CAMELS.length)]; camel = resolveCrazyMover(s, crazyFace); }
+  s.usedDice.push({die:dieColor, face:crazyFace||dieColor, value, camel});
+  const p = currentPlayer(s);
+  addCoins(p, GAME_RULES.PYRAMID_TICKET_COIN); p.pyramidTickets++;
+  const events = moveCamel(s, camel, value);
+  s.log.unshift(`${p.name}: 🎲 ${CAMEL_INFO[camel].name} 낙타 ${value}칸`);
+  return { die:dieColor, face:crazyFace||dieColor, value, camel, events };
+}
+function actionLegBet(s, color){
+  const t = s.legTickets[color]; if(!t.length) throw new Error('남은 타일 없음');
+  const value = t.shift(); s.legBets.push({player:s.currentPlayerIndex, color, value});
+  s.log.unshift(`${currentPlayer(s).name}: ${CAMEL_INFO[color].name} 구간 베팅(${value})`);
+}
+function actionFinalBet(s, color, type){
+  const p = currentPlayer(s); const i = p.finalCards.indexOf(color); if(i<0) throw new Error('카드 없음');
+  p.finalCards.splice(i,1); s.finalBets[type].push({player:p.id, color});
+  s.log.unshift(`${p.name}: 최종 ${type==='winner'?'1등':'꼴찌'} 카드 사용 (비공개)`);
+}
+function validTileSpaces(s){
+  const me = s.currentPlayerIndex, out=[];
+  for (let p=1;p<=GAME_RULES.TRACK_LENGTH;p++){
+    if (GAME_RULES.SPECTATOR_TILE_FORBIDDEN.includes(p) || s.stacks[p]) continue;
+    const other = q => s.spectatorTiles[q] && s.spectatorTiles[q].owner!==me;
+    if (other(p)) continue;
+    if (GAME_RULES.SPECTATOR_TILE_NO_ADJACENT && (other(p-1)||other(p+1))) continue;
+    out.push(p);
+  }
+  return out;
+}
+function actionPlaceTile(s, pos, side){
+  if(!validTileSpaces(s).includes(pos)) throw new Error('놓을 수 없는 칸');
+  for (const q in s.spectatorTiles) if (s.spectatorTiles[q].owner===s.currentPlayerIndex) delete s.spectatorTiles[q];
+  s.spectatorTiles[pos] = {owner:s.currentPlayerIndex, side};
+  s.log.unshift(`${currentPlayer(s).name}: ${pos}번 칸에 ${side==='cheer'?'응원':'야유'} 타일`);
+}
+function endTurn(s){
+  const result = { legEnded:false, gameEnded:false, leg:null, final:null };
+  if (isFinished(s)) { result.gameEnded = true; result.leg = settleLeg(s); result.final = settleFinal(s); s.status='finished'; return result; }
+  if (s.usedDice.length >= GAME_RULES.DICE_DRAWN_PER_LEG) { result.legEnded = true; result.leg = settleLeg(s); startNextLeg(s); }
+  s.currentPlayerIndex = (s.currentPlayerIndex+1) % s.playerCount;
+  return result;
+}
+function settleLeg(s){
+  const rank = ranking(s), lines=[];
+  for (const b of s.legBets){
+    const gain = b.color===rank[0] ? b.value : b.color===rank[1] ? GAME_RULES.LEG_BET_SECOND_PLACE : GAME_RULES.LEG_BET_WRONG;
+    addCoins(s.players[b.player], gain); lines.push({player:b.player, text:`${CAMEL_INFO[b.color].name} 베팅 ${gain>0?'+':''}${gain}`});
+  }
+  return { first:rank[0], second:rank[1], lines };
+}
+function startNextLeg(s){
+  s.legBets=[]; s.spectatorTiles={}; s.usedDice=[]; s.dicePool=[...GAME_RULES.RACING_CAMELS,'grey']; s.currentLeg++;
+  s.legTickets = Object.fromEntries(GAME_RULES.RACING_CAMELS.map(c=>[c,[...GAME_RULES.LEG_BET_TICKETS]]));
+  s.players.forEach(p=>p.pyramidTickets=0);
+}
+function settleFinal(s){
+  const rank = ranking(s), lines=[];
+  for (const [type, target] of [['winner',rank[0]],['loser',rank[rank.length-1]]]){
+    let correct=0;
+    for (const b of s.finalBets[type]){
+      const gain = b.color===target ? (GAME_RULES.FINAL_BET_PAYOUT[correct++] ?? GAME_RULES.FINAL_BET_PAYOUT.at(-1)) : GAME_RULES.FINAL_BET_WRONG;
+      addCoins(s.players[b.player], gain); lines.push({player:b.player, text:`최종 ${type==='winner'?'1등':'꼴찌'} ${CAMEL_INFO[b.color].name} ${gain>0?'+':''}${gain}`});
+    }
+  }
+  const standings = [...s.players].sort((a,b)=>b.coins-a.coins);
+  s.winner = standings[0].id;
+  return { rank, lines, standings };
+}
+
+/* =====================================================================
+   3. 엔진 테스트
+   ===================================================================== */
+function runEngineTests(){
+  const T=[]; const ok=(n,c)=>T.push({n,ok:!!c});
+  const mk=(n=3)=>{ const s=createGame(Array.from({length:n},(_,i)=>({name:'P'+(i+1)})),()=>0); s.stacks={}; return s; };
+  let s=mk(); s.stacks={1:['red']}; moveCamel(s,'red',2); ok('CASE1 단일 낙타 이동', s.stacks[3]?.[0]==='red');
+  s=mk(); s.stacks={3:['red'],1:['blue']}; moveCamel(s,'blue',2); ok('CASE2 두 마리 스택(위로)', JSON.stringify(s.stacks[3])==='["red","blue"]');
+  s=mk(); s.stacks={3:['red','blue'],2:['green']}; moveCamel(s,'green',1); ok('CASE3 세 마리 스택', JSON.stringify(s.stacks[3])==='["red","blue","green"]');
+  s=mk(); s.stacks={3:['green','red','yellow']}; moveCamel(s,'red',2); ok('CASE4 중간 낙타 이동 → 위만 함께', JSON.stringify(s.stacks[3])==='["green"]' && JSON.stringify(s.stacks[5])==='["red","yellow"]');
+  s=mk(); s.stacks={3:['green','red','yellow']}; moveCamel(s,'yellow',1); ok('CASE5 최상단 낙타 단독 이동', JSON.stringify(s.stacks[3])==='["green","red"]' && s.stacks[4]?.[0]==='yellow');
+  s=mk(); s.stacks={10:['black']}; moveCamel(s,'black',3); ok('CASE6 미친 낙타 역방향', s.stacks[7]?.[0]==='black');
+  s=mk(); s.stacks={10:['black'],8:['red']}; moveCamel(s,'black',2); ok('CASE7 미친 낙타 합류 시 위로', JSON.stringify(s.stacks[8])==='["red","black"]');
+  s=mk(); s.stacks={2:['red']}; s.spectatorTiles={4:{owner:1,side:'cheer'}}; moveCamel(s,'red',2); ok('CASE8 응원(OASIS) +1칸, 주인 코인', s.stacks[5]?.[0]==='red' && s.players[1].coins===4);
+  s=mk(); s.stacks={2:['red'],3:['blue']}; s.spectatorTiles={4:{owner:1,side:'boo'}}; moveCamel(s,'red',2); ok('CASE9 야유(MIRAGE) -1칸, 아래로', JSON.stringify(s.stacks[3])==='["red","blue"]');
+  s=createGame([{name:'A'},{name:'B'},{name:'C'}],()=>0); for(let i=0;i<GAME_RULES.DICE_DRAWN_PER_LEG-1;i++){ actionDrawDie(s,()=>0); endTurn(s);} const notYet=s.currentLeg===1; actionDrawDie(s,()=>0); endTurn(s);
+    ok(`CASE10 주사위 ${GAME_RULES.DICE_DRAWN_PER_LEG}개째에 구간 종료 (그 전엔 유지)`, notYet && s.currentLeg===2 && s.usedDice.length===0);
+  s=mk(); s.stacks={5:['red'],4:['blue'],1:['green','yellow','purple']}; actionLegBet(s,'red'); s.currentPlayerIndex=1; actionLegBet(s,'blue'); s.currentPlayerIndex=2; actionLegBet(s,'green');
+    settleLeg(s); ok('CASE11 구간 베팅 정산 (5 / 1 / -1)', s.players[0].coins===8 && s.players[1].coins===4 && s.players[2].coins===2);
+  s=mk(); s.stacks={17:['red'],5:['blue','green'],2:['yellow'],1:['purple']}; actionFinalBet(s,'red','winner'); s.currentPlayerIndex=1; actionFinalBet(s,'red','winner'); s.currentPlayerIndex=2; actionFinalBet(s,'blue','winner');
+    settleFinal(s); ok('CASE12 최종 1등 베팅 (8 / 5 / -1)', s.players[0].coins===11 && s.players[1].coins===8 && s.players[2].coins===2);
+  s=mk(); s.stacks={17:['red'],5:['blue','green'],2:['yellow'],1:['purple']}; actionFinalBet(s,'purple','loser'); settleFinal(s); ok('CASE13 최종 꼴찌 베팅 (+8)', s.players[0].coins===11);
+  s=mk(); s.stacks={15:['red']}; moveCamel(s,'red',3); ok('CASE14 결승선 통과 → 게임 종료', isFinished(s) && endTurn(s).gameEnded);
+  s=mk(); s.stacks={5:['green','red','yellow'],4:['blue'],2:['purple']}; ok('CASE15 동일 칸 스택 순위', ranking(s).join()==='yellow,red,green,blue,purple');
+  for (const n of [2,3,4,5,6]){ const g=createGame(Array.from({length:n},(_,i)=>({name:'P'+i}))); ok(`CASE${14+n} ${n}인 게임 생성`, g.players.length===n && g.players.every(p=>p.coins===PLAYER_COUNT_CONFIG[n].startCoins && p.finalCards.length===5)); }
+  s=createGame([{name:'A'},{name:'B'}]); ok('CASE21 초기 세팅: 7마리 모두 출발 구역', GAME_RULES.SETUP_MODE!=='start' || s.stacks[0]?.length===7);
+  s=createGame([{name:'A'},{name:'B'}],()=>0); if(GAME_RULES.SETUP_MODE==='start'){ moveCamel(s,'black',2); moveCamel(s,'red',1); }
+    ok('CASE22 출발 구역: 스택 없이 한 마리만 이동, 미친 낙타 2 → 15번', GAME_RULES.SETUP_MODE!=='start' || (s.stacks[15]?.[0]==='black' && s.stacks[1]?.[0]==='red' && s.stacks[0]?.length===5));
+  s=mk(); s.stacks={2:['white','blue']}; moveCamel(s,'white',3); ok('CASE23 미친 낙타 출발선 뒤로 넘으면 16번 이어짐 (2→1→16→15)', s.stacks[15]?.join()==='white,blue');
+  return T;
+}
+
+/* =====================================================================
+   4. 낙타 캐릭터 (SVG, 오른쪽을 보는 단봉낙타 — 미친 낙타는 CSS로 좌우 반전)
+   ===================================================================== */
+function camelSVG(c){
+  const f=CAMEL_INFO[c].css, d=CAMEL_INFO[c].dark, eye = isCrazy(c)?'#E05A5A':'#2B2130';
+  return `<svg viewBox="0 0 64 46" xmlns="http://www.w3.org/2000/svg">
+    <g stroke="${d}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+      <path d="M14 30v12M22 30v13M36 30v13M44 30v12" fill="none" stroke-width="4"/>
+      <path d="M6 24c2 4 4 4 6 1" fill="none"/>
+      <ellipse cx="29" cy="27" rx="19" ry="9" fill="${f}"/>
+      <path d="M18 21c2-11 16-11 18 0z" fill="${f}"/>
+      <path d="M44 25c3-4 3-12 5-16" fill="none" stroke-width="7" stroke="${d}"/>
+      <path d="M44 25c3-4 3-12 5-16" fill="none" stroke-width="4" stroke="${f}"/>
+      <ellipse cx="52" cy="8" rx="8" ry="5.5" fill="${f}"/>
+      <path d="M47 4l-1-3 3 2" fill="${f}"/>
+      <circle cx="59" cy="9" r="1.4" fill="${d}" stroke="none"/>
+    </g>
+    <ellipse class="eye" cx="53" cy="7.5" rx="1.8" ry="2.2" fill="${eye}"/>
+    <ellipse cx="53.6" cy="6.8" rx=".6" ry=".7" fill="#fff"/>
+    <path d="M55 11c1 1 3 1 4 0" fill="none" stroke="${d}" stroke-width="1.2" stroke-linecap="round"/>
+  </svg>`;
+}
+const PYRAMID_SVG = `<svg viewBox="0 0 100 80" xmlns="http://www.w3.org/2000/svg" style="width:96px;height:78px;display:block;margin:0 auto">
+  <polygon points="50,4 96,74 4,74" fill="#D9A45B" stroke="#A8783A" stroke-width="3" stroke-linejoin="round"/>
+  <polygon points="50,4 96,74 50,74" fill="#B9843F"/>
+  <line x1="50" y1="4" x2="50" y2="74" stroke="#A8783A" stroke-width="2"/>
+  <path d="M28 40h44M18 56h64" stroke="#A8783A" stroke-width="2" opacity=".5"/>
+  <rect x="40" y="52" width="20" height="22" rx="3" fill="#6B4A1E"/>
+</svg>`;
+function camelEl(c, cls=''){ return `<div class="camel ${isCrazy(c)?'crazy':''} ${cls}" data-camel="${c}">${camelSVG(c)}</div>`; }
+
+/* =====================================================================
+   5. UI 공통
+   ===================================================================== */
+const TIPS = {
+  home:['게임 목표','낙타를 조종하는 게임이 아니에요. 낙타의 움직임을 예측해 베팅하고, 게임이 끝났을 때 코인이 가장 많은 사람이 이겨요.'],
+  stack:['낙타 스택','같은 칸에 낙타가 있으면 위로 올라가요. 아래 낙타가 움직이면 그 위의 낙타도 함께 움직여요. 같은 칸에서는 위에 있는 낙타가 더 앞선 순위예요.'],
+  leg:['구간 베팅','이번 구간에서 1등할 것 같은 낙타를 골라요. 먼저 베팅할수록 값이 큰 타일(5→3→2→2)을 가져가요. 1등이면 타일 값, 2등이면 +1, 아니면 -1이에요.'],
+  crazy:['미친 낙타','검정·하양 낙타는 반대 방향으로 달려요. 출발 구역에서 뒤로 돌아 16번 칸부터 내려오고, 1번을 지나면 다시 16번으로 이어져요. 등에 다른 낙타를 업고 뒤로 가면 순위가 순식간에 바뀌어요.'],
+  final:['최종 베팅','게임이 끝났을 때 최종 1등 또는 꼴찌가 될 낙타를 예측해요. 카드는 비공개! 정답이면 먼저 낸 순서대로 8·5·3·2·1 코인, 틀리면 -1이에요.'],
+  tile:['응원 / 야유 타일','응원(OASIS)은 낙타를 1칸 앞으로, 야유(MIRAGE)는 1칸 뒤로 보내요. 누가 밟든 타일 주인은 1코인을 받아요. 보드의 타일에는 주인 이름이 적혀 있어요. 낙타가 없는 빈 칸에만 놓을 수 있어요.'],
+  dice:['주사위 뽑기','피라미드에서 주사위 하나를 꺼내요. 뽑은 사람은 바로 1코인! 그 색 낙타가 나온 숫자만큼 이동해요. 피라미드의 주사위가 다 나오면 구간이 끝나요.'],
+  world:['월드 게임','한 명이 방을 만들어 코드를 공유하면 각자 기기에서 참가해요. 내 행동은 자동으로 업로드되고, 다른 사람의 행동은 2초마다 자동으로 불러와요.'],
+};
+let ui = { screen:'home', mode:'local', count:4, names:[], game:null, overlay:null, tip:null, picking:null, pendingResult:null, tests:null, result:null,
+  room:null, clientId:null, myName:'', joinCode:'', lastSync:0, poll:null, syncing:false, err:'' };
+const $app = document.getElementById('app');
+const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const dot = c => `<span class="dot" style="background:${CAMEL_INFO[c].css}"></span>`;
+const isWorld = () => ui.mode==='world';
+const myPlayer = () => isWorld() ? ui.game?.players.find(p=>p.clientId===ui.clientId) : currentPlayer(ui.game);
+const isMyTurn = () => !isWorld() || currentPlayer(ui.game)?.clientId===ui.clientId;
+
+function render(){
+  let html = '';
+  const v = { home:viewHome, count:viewCount, names:viewNames, pass:viewPass, game:viewGame, result:viewResult, howto:viewHowto, settings:viewSettings,
+    world:viewWorld, lobby:viewLobby }[ui.screen];
+  html = v();
+  if (ui.overlay) html += ui.overlay;
+  if (ui.tip) html += `<div class="overlay" onclick="closeTip()"><div class="sheet" onclick="event.stopPropagation()"><h3>💡 ${TIPS[ui.tip][0]}</h3><p>${TIPS[ui.tip][1]}</p><button class="btn light center" onclick="closeTip()">알겠어요</button></div></div>`;
+  $app.innerHTML = html;
+  if (ui.screen==='game') layoutTrack();
+  patchSyncText();
+}
+window.closeTip = ()=>{ ui.tip=null; render(); };
+window.showTip = k => { ui.tip=k; render(); };
+window.go = s => { ui.screen=s; ui.overlay=null; if(!['lobby','game','result','world'].includes(s)) stopPoll(); if(s==='world'){ ui.storageState='checking'; probeStorage().then(render); } render(); };
+
+function viewHome(){
+  const cams = GAME_RULES.RACING_CAMELS.map((c,i)=>`<div style="position:absolute;left:${-4+i*21}%;bottom:${i%2?52:6}px;animation-delay:${i*.3}s" class="camel">${camelSVG(c)}</div>`).join('');
+  return `<div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+    <h1>🐪 낙타 레이스</h1><p class="sub">Camel Up 2판 규칙 · 비공식 팬 구현</p>
+    <div class="hero">${cams}</div>
+    <button class="btn" onclick="ui.mode='local';go('count')">로컬 게임<small>한 기기로 함께 플레이 (2~6명)</small></button>
+    <button class="btn" style="background:var(--night-soft);box-shadow:0 6px 0 #3B2A6A" onclick="ui.mode='world';go('world')">월드 게임<small>각자의 기기로 · 방 코드로 참가 (2~6명)</small></button>
+    <button class="btn light" onclick="go('howto')">게임 방법</button>
+    <button class="btn light" onclick="go('settings')">설정 · 규칙 값 · 엔진 테스트</button>
+  </div>`;
+}
+function viewCount(){
+  return `<h2>몇 명이 플레이하나요?</h2>
+    <div class="row" style="margin-bottom:8px">${[2,3,4,5,6].map(n=>`<button class="pill ${ui.count===n?'sel':''}" onclick="ui.count=${n};render()">${n}</button>`).join('')}</div>
+    <p class="sub">${PLAYER_COUNT_CONFIG[ui.count].official?'공식 인원 설정':'⚠️ '+PLAYER_COUNT_CONFIG[ui.count].note}</p>
+    <button class="btn center" onclick="ui.names=Array.from({length:ui.count},(_,i)=>ui.names[i]||'');go('names')">다음</button>
+    <button class="btn ghost" onclick="go('home')">← 메인으로</button>`;
+}
+function viewNames(){
+  return `<h2>이름을 입력하세요</h2><p class="sub">플레이 순서는 시작할 때 무작위로 정해져요.</p>
+    ${ui.names.map((n,i)=>`<input placeholder="플레이어 ${i+1}" value="${esc(n)}" maxlength="10" oninput="ui.names[${i}]=this.value">`).join('')}
+    <button class="btn center" onclick="startLocalGame()">게임 시작 🎲</button>
+    <button class="btn ghost" onclick="go('count')">← 인원 변경</button>`;
+}
+window.startLocalGame = ()=>{
+  let players = ui.names.map((n,i)=>({name:n.trim()||`플레이어 ${i+1}`}));
+  if (GAME_RULES.RANDOM_TURN_ORDER) players = shuffle(players);
+  ui.game = createGame(players); ui.pendingResult=null; ui.picking=null; ui.camelXY=null;
+  ui.overlay = orderOverlay(ui.game, "ui.overlay=null;go('pass')"); ui.screen='game'; render();
+};
+/* 오버레이 큐: 순서 → 구간 종료 → 내 차례 처럼 여러 안내가 겹칠 때 하나씩 보여준다 */
+ui.overlayQueue = [];
+function queueOverlay(html){ ui.overlayQueue.push(html); if (!ui.overlay) nextOverlay(); }
+window.nextOverlay = ()=>{ ui.overlay = ui.overlayQueue.shift() || null; render(); };
+function turnOverlay(g){
+  const me=myPlayer();
+  return `<div class="overlay"><div class="sheet" style="text-align:center"><div style="font-size:60px;line-height:1">🐪</div>
+    <h3 style="margin-top:6px">${esc(me?.name||'')}님, 내 차례예요!</h3><p>LEG ${g.currentLeg} · 행동을 하나 골라주세요.</p>
+    <button class="btn center" onclick="nextOverlay()">확인</button></div></div>`;
+}
+/** 구간 종료 안내를 공유 가능한 데이터로 만든다 (모든 기기에서 같은 모달을 띄우기 위함) */
+function makeLegNotice(g, res){
+  return { leg:g.currentLeg-1, nextLeg:g.currentLeg, first:res.leg.first, second:res.leg.second,
+    lines: res.leg.lines.map(l=>({name:g.players[l.player].name, text:l.text})),
+    coins: g.players.map(p=>({name:p.name, coins:p.coins})) };
+}
+function legNoticeHtml(n, next){
+  const lines = n.lines.map(l=>`<div>${esc(l.name)}: ${esc(l.text)}</div>`).join('')||'<div>구간 베팅이 없었어요.</div>';
+  return `<div class="overlay"><div class="sheet"><h3>🏁 LEG ${n.leg} 종료!</h3><p>구간 1등 ${dot(n.first)} ${CAMEL_INFO[n.first].name}, 2등 ${dot(n.second)} ${CAMEL_INFO[n.second].name}</p>
+      <div class="card">${lines}</div><p>타일과 주사위가 피라미드로 돌아갔어요. LEG ${n.nextLeg} 시작!</p>
+      <div class="rank">${n.coins.map(p=>`<span class="chip">${esc(p.name)} <span class="coin">${p.coins}</span></span>`).join('')}</div><div style="height:12px"></div>
+      <button class="btn center" onclick="${next}">${isWorld()?'확인':'다음 플레이어에게 전달'}</button></div></div>`;
+}
+function orderOverlay(g, next){
+  return `<div class="overlay"><div class="sheet"><h3>🎲 플레이 순서가 정해졌어요</h3>
+    ${g.players.map((p,i)=>`<div class="lobby-row"><span>${i+1}번째 · ${esc(p.name)}</span><span class="coin">💰 ${p.coins}</span></div>`).join('')}
+    <p style="margin-top:10px">${GAME_RULES.SETUP_MODE==='start'?'모든 낙타는 출발 구역에서 나란히 시작해요. 일반 낙타는 1번 칸부터 앞으로, 미친 낙타는 16번 칸부터 뒤로 달려요.':'낙타는 주사위 값 칸에서 시작해요.'}</p>
+    <button class="btn center" onclick="${next}">시작!</button></div></div>`;
+}
+function viewPass(){
+  const p = currentPlayer(ui.game);
+  return `<div class="pass"><div class="big">📱</div><h2><span class="name">${esc(p.name)}</span>의 차례</h2>
+    <p class="sub">기기를 ${esc(p.name)}에게 전달하세요.<br>다른 사람은 화면을 보지 마세요 👀</p>
+    <button class="btn center" onclick="go('game')">확인, ${esc(p.name)}입니다</button></div>`;
+}
+
+/* ---- 플레이어 순서/코인 스트립 ---- */
+function playerStrip(g){
+  const meId = myPlayer()?.id;
+  return `<div class="strip">${g.players.map((p,i)=>`<div class="seat ${g.currentPlayerIndex===i?'now':''} ${p.id===meId?'me':''}"><div class="n">${i+1}번째${g.currentPlayerIndex===i?' · 차례':''}</div><div>${esc(p.name)}</div><div class="c">💰${p.coins}</div></div>`).join('')}</div>`;
+}
+
+/* ---- 게임 화면 ---- */
+function viewGame(){
+  const g=ui.game, cur=currentPlayer(g), me=myPlayer(), rank=ranking(g), acted=!!ui.pendingResult, mine=isMyTurn();
+  const allCamels=[...GAME_RULES.RACING_CAMELS,...GAME_RULES.CRAZY_CAMELS].map(c=>camelEl(c)).join('');
+  const cells=[]; for(let p=1;p<=GAME_RULES.TRACK_LENGTH;p++){
+    const t=g.spectatorTiles[p], pick=ui.picking&&ui.picking.spaces.includes(p);
+    cells.push(`<div class="cell ${t?'tile-'+t.side:''} ${pick?'pick':''}" data-pos="${p}" ${pick?`onclick="pickSpace(${p})"`:''}>${p}${t?`<span class="tilelabel" title="${esc(g.players[t.owner].name)}의 ${t.side==='cheer'?'응원':'야유'} 타일"><em>${t.side==='cheer'?'👏':'👎'}</em>${esc(g.players[t.owner].name)}${t.owner===myPlayer()?.id?' (나)':''}</span>`:''}</div>`);
+  }
+  const trackHtml = `<div class="track">${cells.join('')}
+      <div class="arrow a-bottom">▶</div><div class="arrow a-right">▲</div><div class="arrow a-top">◀</div><div class="arrow a-left">▼</div>
+      <div class="zone start" data-pos="0">출발 구역 · 1번 칸으로 →</div><div class="zone crazyzone">← 미친 낙타는 16번 칸으로</div><div class="zone fin">🏁</div><div class="finishline"></div>
+      <div class="camels">${allCamels}</div></div>`;
+  const usedDice = g.usedDice.map(d=>`<div class="die" style="background:${d.die==='grey'?'#9A9AA6':CAMEL_INFO[d.die].css}">${d.value}</div>`).join('')
+    + g.dicePool.map(d=>`<div class="die unused" style="background:${d==='grey'?'#9A9AA6':CAMEL_INFO[d].css}">?</div>`).join('');
+  let actions;
+  if (ui.picking) actions = `<div class="card"><b>${ui.picking.side==='cheer'?'👏 응원 타일':'👎 야유 타일'}</b> — 트랙에서 놓을 칸을 누르세요.<button class="btn ghost" onclick="ui.picking=null;render()">취소</button></div>`;
+  else if (acted) actions = `<div class="card">${ui.pendingResult.html}</div>${isWorld()?'':`<button class="btn center" onclick="finishTurn()">턴 종료 ▶ 다음 플레이어</button>`}`;
+  else if (!mine) actions = `<div class="card wait">⏳ <span class="name">${esc(cur.name)}</span>의 차례예요${ui.room?.lastEvent?`<div style="margin-top:8px;text-align:left">${ui.room.lastEvent}</div>`:''}</div>`;
+  else actions = `<div class="card"><b>${isWorld()?'내 차례예요!':'내 차례'} — 행동을 하나 고르세요</b>
+      <div style="height:8px"></div>
+      <button class="btn" onclick="drawDie()">🎲 주사위 뽑기 <small>바로 +1 코인, 낙타가 움직여요</small></button>
+      <button class="btn light" onclick="openLegBet()">🐪 구간 베팅 <small>이번 구간 1등 낙타 예측</small></button>
+      <button class="btn light" onclick="openFinalBet()">🏆 최종 베팅 <small>최종 1등 / 꼴찌 예측 (비공개)</small></button>
+      <button class="btn light" onclick="openTile()" ${validTileSpaces(g).length?'':'disabled'}>🏜️ 응원/야유 타일 <small>낙타를 1칸 앞·뒤로</small></button></div>`;
+  const privateBox = me ? `<div class="card mine"><div style="font-size:13px;font-weight:800;margin-bottom:6px">🔒 ${esc(me.name)}의 비공개 정보</div>
+      <div class="rank" style="margin-bottom:6px">구간 베팅: ${g.legBets.filter(b=>b.player===me.id).map(b=>`<span class="chip">${dot(b.color)}${b.value}</span>`).join('')||'<span class="tag">없음</span>'}</div>
+      <div class="rank" style="margin-bottom:6px">최종 베팅: ${[...g.finalBets.winner.filter(b=>b.player===me.id).map(b=>`<span class="chip">🏆${dot(b.color)}</span>`),...g.finalBets.loser.filter(b=>b.player===me.id).map(b=>`<span class="chip">🐢${dot(b.color)}</span>`)].join('')||'<span class="tag">없음</span>'}</div>
+      <div class="rank">남은 카드: ${me.finalCards.map(dot).join('')||'<span class="tag">없음</span>'}</div></div>` : '';
+  const sync = isWorld() ? `<div class="sync"><span class="sync-text"></span></div>` : '';
+  return `<div class="topbar"><span>${isWorld()?'🌍 방 '+esc(ui.room.code):'📱 로컬'} · LEG ${g.currentLeg}</span><span>${isWorld()&&me?'💰 '+me.coins:''}</span><button class="tipbtn" onclick="showTip('${ui.picking?'tile':acted?'stack':'dice'}')">💡</button></div>
+    ${playerStrip(g)}${sync}
+    ${trackHtml}
+    <div class="card"><div class="rank">${rank.map((c,i)=>`<span class="chip">${['🥇','🥈','🥉','4','5'][i]} ${dot(c)}${CAMEL_INFO[c].name}</span>`).join('')}</div>
+      <div style="height:8px"></div><div class="dice">${usedDice}</div></div>
+    ${actions}${privateBox}
+    <div class="card"><div class="log">${g.log.slice(0,5).map(esc).join('<br>')||'아직 행동이 없어요.'}</div></div>
+    <button class="btn ghost" onclick="if(confirm('게임을 나가고 메인으로 갈까요?'))go('home')">게임 나가기</button>`;
+}
+/** 사각 둘레 트랙(부루마블형). 5×5 격자의 바깥 16칸이 트랙, 안쪽 3×3이 출발/대기 구역.
+    결승선은 아래줄 가운데(16번|1번 사이), 진행은 아래줄 → 오른쪽 → 위줄 → 왼쪽 순으로 한 바퀴. */
+function trackGeometry(track){
+  const W=track.clientWidth, pad=8, gap=5, N=5;
+  const cw=Math.floor((W-2*pad-(N-1)*gap)/N), ch=Math.min(cw, 62), H=2*pad+N*ch+(N-1)*gap;
+  // 칸 p → 격자 (col,row). row 0이 위, row 4가 아래.
+  const grid=p=>{
+    if (p<=2)  return {col:2+p, row:4};        // 1,2: 아래줄 오른쪽으로
+    if (p<=6)  return {col:4, row:6-p};        // 3~6: 오른쪽 기둥 위로 (6=우상 모서리)
+    if (p<=10) return {col:10-p, row:0};       // 7~10: 위줄 왼쪽으로 (10=좌상 모서리)
+    if (p<=14) return {col:0, row:p-10};       // 11~14: 왼쪽 기둥 아래로 (14=좌하 모서리)
+    return {col:p-14, row:4};                  // 15,16: 아래줄 오른쪽으로 → 결승선
+  };
+  const cell=p=>{ const g=grid(p); return {x:pad+g.col*(cw+gap), y:pad+g.row*(ch+gap), col:g.col, row:g.row}; };
+  const facesLeft=p=>{ const g=grid(p); return g.row===0 || (g.col===0 && g.row<4); };   // 위줄·왼쪽 기둥은 왼쪽을 본다
+  const inner={x:pad+(cw+gap), y:pad+(ch+gap), w:3*cw+2*gap, h:3*ch+2*gap};
+  return {W,H,cw,ch,pad,gap,cell,facesLeft,inner};
+}
+function layoutTrack(){
+  const g=ui.game, track=$app.querySelector('.track'); if(!track||!g) return;
+  const G=trackGeometry(track); track.style.height=G.H+'px';
+  const camW=42, camH=31;
+  track.querySelectorAll('.cell').forEach(el=>{ const c=G.cell(+el.dataset.pos); el.style.left=c.x+'px'; el.style.top=c.y+'px'; el.style.width=G.cw+'px'; el.style.height=G.ch+'px';
+    el.classList.toggle('corner', (c.col===0||c.col===4)&&(c.row===0||c.row===4)); });
+  const I=G.inner;
+  // 진행 방향 화살표: 안쪽 영역 가장자리
+  const ar=(cls,l,t)=>{ const el=track.querySelector('.arrow.'+cls); el.style.left=l+'px'; el.style.top=t+'px'; };
+  ar('a-bottom', I.x+I.w/2-8, I.y+I.h-18); ar('a-right', I.x+I.w-18, I.y+I.h/2-8); ar('a-top', I.x+I.w/2-8, I.y+2); ar('a-left', I.x+2, I.y+I.h/2-8);
+  // 결승선: 아래줄 16번|1번 사이
+  const c1=G.cell(1); const fl=track.querySelector('.finishline'); fl.style.left=(c1.x-G.gap/2-4)+'px'; fl.style.top=(c1.y-4)+'px'; fl.style.width='8px'; fl.style.height=(G.ch+8)+'px';
+  const fz=track.querySelector('.zone.fin'); fz.style.left=(c1.x-G.gap/2-14)+'px'; fz.style.top=(c1.y-24)+'px'; fz.style.width='28px'; fz.style.fontSize='16px';
+  // 출발 구역(일반 낙타 5) 안쪽 아래, 미친 낙타 구역 안쪽 위
+  const startW=Math.min(5*(camW+4)+8, I.w-24), startH=camH+22;
+  const sz=track.querySelector('.zone.start'); sz.style.left=(I.x+I.w/2-startW/2)+'px'; sz.style.top=(I.y+I.h-startH-20)+'px'; sz.style.width=startW+'px'; sz.style.height=startH+'px';
+  const cz=track.querySelector('.zone.crazyzone'); cz.style.left=(I.x+I.w/2-startW/2)+'px'; cz.style.top=(I.y+16)+'px'; cz.style.width=startW+'px';
+  const startTop=I.y+I.h-startH-20, crazyTop=I.y+16;
+  // 낙타 좌표
+  const prev = ui.camelXY || {}; const next = {};
+  const startRacing=[], startCrazy=[];
+  for (const c of [...GAME_RULES.RACING_CAMELS,...GAME_RULES.CRAZY_CAMELS]){
+    const {pos,idx}=locate(g,c); if(pos===GAME_RULES.START_ZONE) (isCrazy(c)?startCrazy:startRacing).push(c);
+  }
+  for (const c of [...GAME_RULES.RACING_CAMELS,...GAME_RULES.CRAZY_CAMELS]){
+    const {pos,idx}=locate(g,c), el=track.querySelector(`.camel[data-camel="${c}"]`);
+    let x, y, z=10+idx, left=isCrazy(c);   // 출발 구역: 일반 낙타는 → 1번(오른쪽), 미친 낙타는 ← 16번(왼쪽)
+    if (pos===GAME_RULES.START_ZONE){
+      const row=isCrazy(c)?startCrazy:startRacing, k=row.indexOf(c), n=row.length;
+      const slot=isCrazy(c)? camW+16 : Math.min(camW+4, (startW-8)/Math.max(n,1));
+      x = I.x+I.w/2 - (n*slot)/2 + k*slot + (slot-camW)/2;
+      y = isCrazy(c) ? crazyTop+16 : startTop+startH-camH-6;
+    } else if (pos>GAME_RULES.TRACK_LENGTH){          // 결승 통과: 안쪽 중앙에 순서대로
+      x = I.x+I.w/2-camW/2 + (pos-17)*26 - 30; y = I.y+I.h/2-camH/2;
+    } else {
+      const cpos=G.cell(pos); x = cpos.x + G.cw/2 - camW/2; y = cpos.y + G.ch - camH - 2 - idx*11;
+      left = G.facesLeft(pos) !== isCrazy(c);       // 트랙 위: 진행 방향을 따라 보고, 미친 낙타는 반대
+    }
+    el.classList.toggle('flip', left);
+    next[c]={x,y}; el.style.zIndex=z;
+    const target=`translate(${x}px,${y}px)`;
+    if (el.dataset.placed){ el.style.transform=target; continue; }
+    // 새로 만들어진 요소: 이전 좌표에 전환 없이 세운 뒤 새 좌표로 미끄러짐 (없으면 (0,0)에서 떨어지는 현상 발생)
+    const from = prev[c] || {x,y};
+    el.style.transition='none'; el.style.transform=`translate(${from.x}px,${from.y}px)`; el.dataset.placed='1';
+    void el.offsetWidth;
+    el.style.transition=''; el.style.transform=target;
+    if (from.x!==x || from.y!==y) el.classList.add('moving');
+  }
+  ui.camelXY = next;
+}
+const layoutCamels = layoutTrack;
+window.addEventListener('resize', ()=>{ if(ui.screen==='game') layoutTrack(); });
+
+/* ---- 행동 핸들러 (로컬/월드 공용) ---- */
+function afterAction(html){
+  ui.overlay=null; ui.picking=null; ui.pendingResult={html};
+  if (isWorld()) { ui.committing=true; render(); setTimeout(()=>worldCommitTurn(html), 1400); } else render();
+}
+window.drawDie = ()=>{
+  const g=ui.game;
+  ui.pendingResult={html:`<div class="pyramid shake">${PYRAMID_SVG}</div><p style="text-align:center;font-weight:800">피라미드를 흔드는 중…</p>`}; render();
+  setTimeout(()=>{
+    const r = actionDrawDie(g);
+    const dieCss = r.die==='grey' ? '#9A9AA6' : CAMEL_INFO[r.die].css;
+    const evs = r.events.map(e=> e.type==='tile' ? `<div>${e.side==='cheer'?'👏 응원 타일! 1칸 더 앞으로':'👎 야유 타일! 1칸 뒤로'} (${esc(g.players[e.owner].name)} +${GAME_RULES.SPECTATOR_TILE_COIN})</div>`
+      : `<div>${e.moving.map(dot).join('')} ${e.from}번 → ${e.to>GAME_RULES.TRACK_LENGTH?'🏁 결승!':e.to+'번 칸'}${e.moving.length>1?' (스택 함께 이동)':''}</div>`).join('');
+    afterAction(`<div style="display:flex;gap:12px;align-items:center;justify-content:center;margin-bottom:8px"><div class="die reveal" style="background:${dieCss};width:56px;height:56px;font-size:28px">${r.value}</div>
+      <div><b>${esc(currentPlayer(g).name)}: ${CAMEL_INFO[r.camel].name} 낙타 ${r.value}칸 ${isCrazy(r.camel)?'뒤로':'앞으로'}!</b>${r.die==='grey'&&r.face!==r.camel?'<br><small>주사위는 '+CAMEL_INFO[r.face].name+'이지만 낙타를 업은 쪽이 이동</small>':''}<br><small>주사위 뽑기 보상 +${GAME_RULES.PYRAMID_TICKET_COIN} 코인</small></div></div>${evs}`);
+    r.events.filter(e=>e.type==='move').forEach(e=>e.moving.forEach(c=>$app.querySelector(`.camel[data-camel="${c}"]`)?.classList.add('moving')));
+  }, 900);
+};
+window.openLegBet = ()=>{
+  const g=ui.game;
+  ui.overlay=`<div class="overlay" onclick="ui.overlay=null;render()"><div class="sheet" onclick="event.stopPropagation()"><h3>🐪 구간 베팅</h3><p>이번 구간 1등 예상 낙타를 고르세요. 숫자는 지금 가져갈 타일의 값이에요.</p>
+    <div class="bets">${GAME_RULES.RACING_CAMELS.map(c=>`<button class="betbtn" style="background:${CAMEL_INFO[c].css}" ${g.legTickets[c].length?'':'disabled'} onclick="doLegBet('${c}')">${camelSVG(c)}${CAMEL_INFO[c].name}<small>타일 ${g.legTickets[c][0]??'품절'}</small></button>`).join('')}</div>
+    <button class="btn ghost" onclick="showTip('leg')">💡 규칙 보기</button></div></div>`; render();
+};
+window.doLegBet = c=>{ const g=ui.game; actionLegBet(g,c); afterAction(`🎫 ${esc(currentPlayer(g).name)}: ${dot(c)} <b>${CAMEL_INFO[c].name}</b> 구간 베팅 타일(값 ${g.legBets.at(-1).value})을 가져갔어요.`); };
+window.openFinalBet = ()=>{
+  const me=currentPlayer(ui.game);
+  const grid = type=>`<div class="bets">${GAME_RULES.RACING_CAMELS.map(c=>`<button class="betbtn" style="background:${CAMEL_INFO[c].css}" ${me.finalCards.includes(c)?'':'disabled'} onclick="doFinalBet('${c}','${type}')">${camelSVG(c)}${CAMEL_INFO[c].name}</button>`).join('')}</div>`;
+  ui.overlay=`<div class="overlay" onclick="ui.overlay=null;render()"><div class="sheet" onclick="event.stopPropagation()"><h3>🏆 최종 베팅 (비공개)</h3><p>낙타별 카드는 1장. 1등 또는 꼴찌 더미 중 하나에 놓아요.</p>
+    <p><b>🏆 최종 1등이 될 낙타</b></p>${grid('winner')}<div style="height:12px"></div><p><b>🐢 최종 꼴찌가 될 낙타</b></p>${grid('loser')}
+    <button class="btn ghost" onclick="showTip('final')">💡 규칙 보기</button></div></div>`; render();
+};
+window.doFinalBet = (c,type)=>{ const g=ui.game; actionFinalBet(g,c,type);
+  // 다른 플레이어에게는 색을 숨긴 문구만 공유
+  const pub = `🔒 ${esc(currentPlayer(g).name)}: 최종 베팅 카드를 1장 냈어요.`;
+  ui.overlay=null; ui.picking=null; ui.pendingResult={html:`🔒 ${dot(c)} <b>${CAMEL_INFO[c].name}</b>을(를) 최종 <b>${type==='winner'?'1등':'꼴찌'}</b>에 걸었어요. 다른 사람에겐 보이지 않아요.`};
+  if (isWorld()) { ui.committing=true; render(); setTimeout(()=>worldCommitTurn(pub), 1400); } else render(); };
+window.openTile = ()=>{
+  ui.overlay=`<div class="overlay" onclick="ui.overlay=null;render()"><div class="sheet" onclick="event.stopPropagation()"><h3>🏜️ 응원 / 야유 타일</h3><p>낙타가 밟으면 타일 주인은 +${GAME_RULES.SPECTATOR_TILE_COIN} 코인. 이미 놓은 내 타일은 옮겨져요.</p>
+    <button class="btn" style="background:var(--ok);box-shadow:0 6px 0 #2E7F50" onclick="startPick('cheer')">👏 응원 (OASIS)<small>밟은 낙타가 1칸 더 앞으로, 스택 위로</small></button>
+    <button class="btn" style="background:var(--warn);box-shadow:0 6px 0 #A33C3C" onclick="startPick('boo')">👎 야유 (MIRAGE)<small>밟은 낙타가 1칸 뒤로, 스택 아래로</small></button></div></div>`; render();
+};
+window.startPick = side=>{ ui.overlay=null; ui.picking={side, spaces:validTileSpaces(ui.game)}; render(); };
+window.pickSpace = pos=>{ const side=ui.picking.side; actionPlaceTile(ui.game,pos,side); afterAction(`${esc(currentPlayer(ui.game).name)}: ${side==='cheer'?'👏 응원':'👎 야유'} 타일을 <b>${pos}번 칸</b>에 놓았어요.`); };
+
+function legOverlayHtml(g, res, next){ return legNoticeHtml(makeLegNotice(g,res), 'ui.overlay=null;'+next); }
+window.finishTurn = ()=>{   // 로컬 모드
+  const g=ui.game, res=endTurn(g); ui.pendingResult=null;
+  if (res.gameEnded){ ui.result=res; ui.screen='result'; render(); return; }
+  if (res.legEnded){ ui.overlay=legOverlayHtml(g,res,"go('pass')"); render(); return; }
+  ui.screen='pass'; render();
+};
+function viewResult(){
+  const g=ui.game, f=ui.result.final, medals=['🥇','🥈','🥉'];
+  const lines=[...ui.result.leg.lines,...f.lines].map(l=>`<div>${esc(g.players[l.player].name)}: ${l.text}</div>`).join('');
+  return `<h1>🎉 게임 종료</h1><p class="sub">우승: <span class="name">${esc(g.players[g.winner].name)}</span> (${g.players[g.winner].coins} 코인)</p>
+    <div class="card"><b>최종 낙타 순위</b><div class="rank" style="margin-top:6px">${f.rank.map((c,i)=>`<span class="chip">${medals[i]||i+1} ${dot(c)}${CAMEL_INFO[c].name}</span>`).join('')}</div></div>
+    <div class="card"><b>플레이어 순위</b>${f.standings.map((p,i)=>`<div style="display:flex;justify-content:space-between;padding:6px 0;font-weight:800;font-size:${i?15:20}px"><span>${medals[i]||i+1} ${esc(p.name)}</span><span class="coin">💰 ${p.coins}</span></div>`).join('')}</div>
+    <div class="card"><b>정산 내역</b><div class="log" style="max-height:160px;margin-top:6px">${lines||'베팅 없음'}</div></div>
+    ${isWorld()?`<button class="btn center" onclick="go('home')">메인으로</button>`:`<button class="btn center" onclick="go('names')">같은 멤버로 다시 하기</button><button class="btn ghost" onclick="go('home')">메인으로</button>`}`;
+}
+function viewHowto(){
+  return `<h2>게임 방법</h2>${Object.keys(TIPS).map(k=>`<div class="card"><b>${TIPS[k][0]}</b><p style="font-weight:600;line-height:1.5;margin-top:4px">${TIPS[k][1]}</p></div>`).join('')}
+    <div class="card"><b>턴 진행</b><p style="font-weight:600;line-height:1.5;margin-top:4px">내 차례에 행동 1개: 주사위 뽑기 / 구간 베팅 / 최종 베팅 / 타일 놓기. 피라미드의 주사위가 다 나오면 구간 정산 후 다음 구간. 일반 낙타가 16번 칸을 넘으면 게임 종료 → 구간 정산 → 최종 1등 → 최종 꼴찌 정산.</p></div>
+    <button class="btn ghost" onclick="go('home')">← 메인으로</button>`;
+}
+function viewSettings(){
+  const rules = Object.entries(GAME_RULES).map(([k,v])=>`<div class="testline"><span style="color:var(--night-soft)">${k}</span> = ${esc(JSON.stringify(v))}</div>`).join('');
+  const pc = Object.entries(PLAYER_COUNT_CONFIG).map(([n,c])=>`<div class="testline">${n}인 · 시작 ${c.startCoins}코인 · 최종카드 ${c.finalCardsPerPlayer} · 타일 ${c.spectatorTilesPerPlayer} ${c.official?'':'· <span class="bad">비공식</span>'}</div>`).join('');
+  const tests = ui.tests ? `<div class="card"><b>엔진 테스트 ${ui.tests.filter(t=>t.ok).length}/${ui.tests.length} 통과</b>${ui.tests.map(t=>`<div class="testline ${t.ok?'ok':'bad'}">${t.ok?'✓':'✗'} ${t.n}</div>`).join('')}</div>` : '';
+  return `<h2>설정</h2>
+    <div class="card"><b>낙타 시작 위치</b><div style="height:8px"></div><div class="toggle">
+      <button class="${GAME_RULES.SETUP_MODE==='start'?'sel':''}" onclick="GAME_RULES.SETUP_MODE='start';render()">출발 구역(나란히)</button>
+      <button class="${GAME_RULES.SETUP_MODE==='dice'?'sel':''}" onclick="GAME_RULES.SETUP_MODE='dice';render()">공식(주사위 1~3)</button></div></div>
+    <div class="card"><b>구간 종료 시점</b><div style="height:8px"></div><div class="toggle">
+      <button class="${GAME_RULES.DICE_DRAWN_PER_LEG===6?'sel':''}" onclick="GAME_RULES.DICE_DRAWN_PER_LEG=6;render()">주사위 6개 모두</button>
+      <button class="${GAME_RULES.DICE_DRAWN_PER_LEG===5?'sel':''}" onclick="GAME_RULES.DICE_DRAWN_PER_LEG=5;render()">공식(5개, 1개 남김)</button></div></div>
+    <div class="card"><b>플레이 순서</b><div style="height:8px"></div><div class="toggle">
+      <button class="${GAME_RULES.RANDOM_TURN_ORDER?'sel':''}" onclick="GAME_RULES.RANDOM_TURN_ORDER=true;render()">무작위</button>
+      <button class="${!GAME_RULES.RANDOM_TURN_ORDER?'sel':''}" onclick="GAME_RULES.RANDOM_TURN_ORDER=false;render()">입력/입장 순서</button></div></div>
+    <button class="btn center" onclick="ui.tests=runEngineTests();render()">🧪 엔진 테스트 실행 (CASE 1~23)</button>${tests}
+    <div class="card"><b>인원별 설정 (PLAYER_COUNT_CONFIG)</b>${pc}</div>
+    <div class="card"><b>게임 규칙 값 (GAME_RULES)</b><div style="font-size:12px;word-break:break-all">${rules}</div></div>
+    <div class="card"><b>확인 필요 (questions/OPEN) · 결정(ADR)</b>
+      <div class="testline">ADR-001 시작 위치: 출발 구역에 7마리 나란히(스택 없음). 일반 낙타는 1번부터, 미친 낙타는 16번부터 뒤로. 공식은 주사위 배치.</div>
+      <div class="testline">ADR-003 구간 종료: 주사위 6개 모두 공개 시. 공식 2판은 5개 공개 후 종료(1개는 피라미드에 남음).</div>
+      <div class="testline">OPEN-001 2인 플레이 밸런스 — 공식 3~8인. 현재 3인 설정 그대로 사용.</div>
+      <div class="testline">ADR-002 미친 낙타가 1번 칸을 지나 뒤로 가면 16번으로 이어짐(CRAZY_WRAP). 업힌 일반 낙타도 함께 16번으로 감 — 이 경우 결승 통과로 보지 않음.</div>
+      <div class="testline">OPEN-003 관중 타일 인접 배치 금지 여부 — 현재 금지.</div>
+      <div class="testline">OPEN-004 회색 주사위 시 이동 낙타 결정 — '등에 일반 낙타를 직접 업은 미친 낙타가 하나뿐이면 그 낙타'.</div></div>
+    <button class="btn ghost" onclick="go('home')">← 메인으로</button>`;
+}
+
+/* =====================================================================
+   6. 월드 모드 — 아티팩트 공유 저장소(window.storage, shared=true)로 상태 교환
+      · 방 상태 전체를 'room:CODE' 키 하나에 저장 (관련 데이터 한 키에 묶기)
+      · 현재 차례 플레이어의 기기가 엔진을 실행하고 업로드, 나머지는 주기적으로 불러옴
+      · 저장 전 version을 비교해 다른 기기의 갱신을 덮어쓰지 않음
+   ===================================================================== */
+const hasStorage = () => !!(window.storage && typeof window.storage.get==='function');
+/** 실제로 쓰기가 되는지 확인 (API 객체는 있어도 이 아티팩트에서 비활성일 수 있음) */
+async function probeStorage(){
+  if (!hasStorage()) { ui.storageState='none'; return; }
+  try { await window.storage.set('probe', '1', true); await window.storage.delete('probe', true); ui.storageState='ok'; }
+  catch(e){ ui.storageState='blocked'; ui.storageErr=e.message||String(e); }
+}
+const roomKey = code => 'room:'+code;
+async function getClientId(){
+  if (ui.clientId) return ui.clientId;
+  try { const r=await window.storage.get('me',false); const me=JSON.parse(r.value); ui.clientId=me.clientId; ui.myName=ui.myName||me.name||''; ui.joinCode=ui.joinCode||me.lastRoom||''; }
+  catch { ui.clientId='c'+Math.random().toString(36).slice(2,10); }
+  return ui.clientId;
+}
+async function saveMe(){ try{ await window.storage.set('me', JSON.stringify({clientId:ui.clientId, name:ui.myName, lastRoom:ui.room?.code||ui.joinCode}), false);}catch{} }
+async function loadRoom(code){ try{ const r=await window.storage.get(roomKey(code),true); return JSON.parse(r.value);}catch{ return null; } }
+async function saveRoom(room){ room.version=(room.version||0)+1; room.updatedAt=Date.now(); await window.storage.set(roomKey(room.code), JSON.stringify(room), true); ui.room=room; ui.lastSync=Date.now(); }
+/** 낙관적 동시성: 최신 버전을 읽어 내 버전과 다르면 실패 */
+async function commit(mutate){
+  const latest = await loadRoom(ui.room.code);
+  if (latest && latest.version !== ui.room.version){ applyRoom(latest); return false; }
+  mutate(ui.room); await saveRoom(ui.room); return true;
+}
+function applyRoom(room){
+  if (room.status!=='playing' || !ui.game || ui.room?.code!==room.code) ui.camelXY=null;
+  ui.room=room; ui.lastSync=Date.now();
+  if (room.status==='lobby'){ ui.screen='lobby'; ui.game=null; return; }
+  ui.game=room.game;
+  if (room.status==='finished'){ ui.result=room.result; ui.screen='result'; return; }
+  if (ui.screen!=='game'){ ui.screen='game'; if (room.game.log.length===0) queueOverlay(orderOverlay(room.game,'nextOverlay()')); }
+  // 구간 종료 안내: 마지막 주사위를 뽑은 사람뿐 아니라 모든 기기에서 한 번씩
+  if (room.legNotice && room.legNotice.leg!==ui.shownLegNotice){ ui.shownLegNotice=room.legNotice.leg; queueOverlay(legNoticeHtml(room.legNotice,'nextOverlay()')); }
+  // 내 차례 안내: 같은 턴에 대해 한 번만
+  const turnKey = room.game.currentLeg+'-'+room.game.log.length+'-'+room.game.currentPlayerIndex;
+  if (isMyTurn() && ui.lastTurnKey!==turnKey){ ui.lastTurnKey=turnKey; queueOverlay(turnOverlay(room.game)); }
+}
+const POLL_MS = 2000;
+function startPoll(){ stopPoll(); ui.poll=setInterval(()=>refreshRoom(false), POLL_MS); }
+/** 변화가 없을 때는 화면 전체를 다시 그리지 않고 동기화 문구만 바꾼다 */
+function patchSyncText(){
+  const el=$app.querySelector('.sync-text'); if(!el) return;
+  el.innerHTML = ui.syncErr ? '⚠️ '+esc(ui.syncErr) : ui.committing ? '<span class="spin">🔄</span> 내 행동 공유 중' : ui.syncing ? '<span class="spin">🔄</span> 동기화 중' : (ui.screen==='game' && isMyTurn()) ? '내 차례 · 행동하면 바로 공유돼요' : '🔄 자동 갱신 중 · 마지막 '+Math.max(0,Math.round((Date.now()-ui.lastSync)/1000))+'초 전';
+}
+function stopPoll(){ if(ui.poll){ clearInterval(ui.poll); ui.poll=null; } }
+window.refreshRoom = async (manual)=>{
+  if (!ui.room || ui.syncing || ui.committing) return;   // 내 행동을 업로드하는 동안은 절대 불러오지 않음(경쟁 조건 방지)
+  if (ui.pendingResult && !manual) return;
+  if (!manual && ui.screen==='game' && isMyTurn()) { patchSyncText(); return; }  // 내 차례엔 남이 바꿀 게 없다
+  ui.syncing=true; patchSyncText();
+  let changed=false;
+  try {
+    const latest=await loadRoom(ui.room.code);
+    // 읽는 사이에 내가 저장했을 수 있으므로, 내 버전보다 '새로운' 것만 적용한다 (오래된 스냅샷으로 되돌리지 않음)
+    if (latest && latest.version > ui.room.version && !ui.committing){ ui.pendingResult=null; ui.picking=null; applyRoom(latest); changed=true; }
+    else ui.lastSync=Date.now();
+    ui.syncErr='';
+  } catch(e){ ui.syncErr=e.message||'연결 문제'; }
+  ui.syncing=false;
+  if (changed || manual) render(); else patchSyncText();
+};
+
+function viewWorld(){
+  if (ui.storageState==='checking') return `<h2>🌍 월드 게임</h2><div class="card wait"><span class="spin">🔄</span> 공유 저장소 확인 중…</div>`;
+  if (ui.storageState!=='ok') return `<h2>🌍 월드 게임</h2><div class="card"><b>이 화면에서는 공유 저장소를 쓸 수 없어요.</b>
+      <p style="font-weight:600;margin-top:6px;line-height:1.5">${ui.storageState==='blocked'?'저장소 API는 있지만 이 아티팩트에서 비활성 상태예요.<br><span class="tag">${esc(ui.storageErr)}</span><br><br>':'저장소 API가 없는 환경이에요 (파일을 직접 연 경우).<br><br>'}
+      월드 게임은 다음 순서로 열어야 해요:<br>1) 채팅의 아티팩트를 <b>게시(Publish)</b><br>2) 생성된 <b>게시 링크</b>를 모든 플레이어가 각자 기기에서 열기<br>3) 그 화면에서 방 만들기 · 참가</p></div>
+    <button class="btn light center" onclick="go('world')">🔄 다시 확인</button>
+    <button class="btn ghost" onclick="go('home')">← 메인으로 (로컬 게임은 항상 가능)</button>`;
+  return `<h2>🌍 월드 게임</h2><p class="sub">한 명이 방을 만들고 코드를 공유하세요.<br>다른 사람은 코드로 참가해요.</p>
+    ${ui.err?`<div class="card bad">${esc(ui.err)}</div>`:''}
+    <input placeholder="내 이름" value="${esc(ui.myName)}" maxlength="10" oninput="ui.myName=this.value">
+    <button class="btn center" onclick="createRoom()">방 만들기 (코드 생성)</button>
+    <div class="card"><input class="code" placeholder="방 코드" value="${esc(ui.joinCode)}" maxlength="5" oninput="ui.joinCode=this.value.toUpperCase()">
+      <button class="btn light center" style="margin:0" onclick="joinRoom()">코드로 참가 / 다시 들어가기</button></div>
+    <button class="btn ghost" onclick="showTip('world')">💡 어떻게 동작하나요?</button>
+    <button class="btn ghost" onclick="go('home')">← 메인으로</button>`;
+}
+const nameOrAsk = ()=>{ const n=ui.myName.trim(); if(!n){ ui.err='먼저 내 이름을 입력하세요.'; render(); return null;} ui.err=''; return n; };
+window.createRoom = async ()=>{
+  const name=nameOrAsk(); if(!name) return; await getClientId();
+  const code = Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random()*32)]).join('');
+  const room = { code, hostId:ui.clientId, status:'lobby', players:[{clientId:ui.clientId,name,ready:true}], game:null, version:0, lastEvent:'' };
+  try { await saveRoom(room); await saveMe(); ui.screen='lobby'; startPoll(); render(); } catch(e){ ui.err='방 생성 실패: '+e.message; render(); }
+};
+window.joinRoom = async ()=>{
+  const name=nameOrAsk(); if(!name) return; await getClientId();
+  const code=ui.joinCode.trim().toUpperCase(); if(code.length<4){ ui.err='방 코드 4자리를 입력하세요.'; render(); return; }
+  const room=await loadRoom(code); if(!room){ ui.err='그 코드의 방을 찾지 못했어요.'; render(); return; }
+  const existing = room.players.find(p=>p.clientId===ui.clientId);
+  if (!existing){
+    if (room.status!=='lobby'){ ui.err='이미 시작된 방이에요.'; render(); return; }
+    if (room.players.length>=6){ ui.err='방이 가득 찼어요 (최대 6명).'; render(); return; }
+    room.players.push({clientId:ui.clientId,name,ready:false}); await saveRoom(room);
+  }
+  await saveMe(); ui.shownLegNotice=room.legNotice?.leg ?? null; ui.lastTurnKey=null; applyRoom(room); startPoll(); render();
+};
+function viewLobby(){
+  const r=ui.room, isHost=r.hostId===ui.clientId, me=r.players.find(p=>p.clientId===ui.clientId), allReady=r.players.every(p=>p.ready);
+  return `<h2>방 대기실</h2><p class="sub">이 코드를 친구에게 공유하세요</p><div class="codebox">${esc(r.code)}</div>
+    <div class="sync"><span class="sync-text"></span></div>
+    <div class="card">${r.players.map((p,i)=>`<div class="lobby-row"><span>${p.clientId===r.hostId?'👑 ':''}${esc(p.name)}${p.clientId===ui.clientId?' (나)':''}</span><span>${p.ready?'✅ 준비':'⏳ 대기'}</span></div>`).join('')}
+      <p style="font-size:13px;font-weight:700;color:var(--night-soft);margin-top:8px">${r.players.length}/6명 · 순서는 시작 시 무작위</p></div>
+    ${me&&!isHost?`<button class="btn ${me.ready?'light':''} center" onclick="toggleReady()">${me.ready?'준비 취소':'준비 완료 ✅'}</button>`:''}
+    ${isHost?`<button class="btn center" ${r.players.length>=2&&allReady?'':'disabled'} onclick="hostStart()">게임 시작 🎲 ${r.players.length<2?'(2명 이상 필요)':allReady?'':'(모두 준비 대기)'}</button>`:'<p class="sub">방장이 시작하면 자동으로 게임 화면으로 넘어가요.</p>'}
+    <button class="btn ghost" onclick="leaveRoom()">방 나가기</button>`;
+}
+window.toggleReady = async ()=>{ const okk=await commit(r=>{ const p=r.players.find(p=>p.clientId===ui.clientId); p.ready=!p.ready; }); if(!okk) ui.err='다른 갱신이 있어 다시 불러왔어요. 한 번 더 눌러주세요.'; render(); };
+window.hostStart = async ()=>{
+  const okk = await commit(r=>{
+    let ps = r.players.map(p=>({name:p.name, clientId:p.clientId}));
+    if (GAME_RULES.RANDOM_TURN_ORDER) ps = shuffle(ps);
+    r.game = createGame(ps); r.status='playing'; r.lastEvent=''; r.legNotice=null;
+  });
+  if (okk) applyRoom(ui.room); else ui.err='다른 갱신이 있어 다시 불러왔어요. 한 번 더 눌러주세요.';
+  render();
+};
+window.leaveRoom = async ()=>{
+  if (ui.room?.status==='lobby') { try{ await commit(r=>{ r.players=r.players.filter(p=>p.clientId!==ui.clientId); if(r.hostId===ui.clientId&&r.players[0]) r.hostId=r.players[0].clientId; }); }catch{} }
+  ui.room=null; go('home');
+};
+/** 내 행동이 끝난 뒤: endTurn까지 처리해 방 전체 상태를 업로드 */
+async function worldCommitTurn(publicHtml){
+  const g=ui.game, res=endTurn(g);
+  try {
+    const latest = await loadRoom(ui.room.code);
+    if (latest && latest.version!==ui.room.version){ ui.committing=false; ui.err='다른 기기의 갱신과 충돌해 내 행동이 취소됐어요. 다시 해주세요.'; ui.pendingResult=null; applyRoom(latest); render(); return; }
+    ui.room.game=g; ui.room.lastEvent=publicHtml;
+    if (res.legEnded){ ui.room.legNotice=makeLegNotice(g,res); ui.shownLegNotice=ui.room.legNotice.leg; }
+    if (res.gameEnded){ ui.room.status='finished'; ui.room.result=res; }
+    await saveRoom(ui.room);
+  } catch(e){
+    ui.syncErr='업로드 실패, 다시 시도 중… ('+(e.message||'')+')'; patchSyncText(); setTimeout(()=>retrySave(res), 3000); return;
+  }
+  ui.committing=false; ui.pendingResult=null;
+  if (res.gameEnded){ ui.result=res; ui.screen='result'; render(); return; }
+  if (res.legEnded){ queueOverlay(legNoticeHtml(ui.room.legNotice,'nextOverlay()')); }
+  const turnKey = g.currentLeg+'-'+g.log.length+'-'+g.currentPlayerIndex;   // 2인전 등 곧바로 내 차례가 다시 올 때
+  if (isMyTurn() && ui.lastTurnKey!==turnKey){ ui.lastTurnKey=turnKey; queueOverlay(turnOverlay(g)); }
+  render();
+}
+async function retrySave(res){
+  try { await saveRoom(ui.room); } catch(e){ setTimeout(()=>retrySave(res), 3000); return; }
+  ui.committing=false; ui.pendingResult=null; ui.syncErr='';
+  if (res.gameEnded){ ui.result=res; ui.screen='result'; } else if (res.legEnded){ queueOverlay(legNoticeHtml(ui.room.legNotice,'nextOverlay()')); }
+  render();
+}
+window.addEventListener('beforeunload', stopPoll);
+/* iOS Safari는 viewport 설정을 무시하므로 핀치·더블탭 확대를 직접 막는다 (세로 스크롤은 유지) */
+document.addEventListener('gesturestart', e=>e.preventDefault(), {passive:false});
+document.addEventListener('touchmove', e=>{ if (e.touches.length>1) e.preventDefault(); }, {passive:false});
+let lastTap=0;
+document.addEventListener('touchend', e=>{ const now=Date.now(); if (now-lastTap<300 && e.target.tagName!=='INPUT') e.preventDefault(); lastTap=now; }, {passive:false});
+render();
+</script>
+</body>
+</html>
