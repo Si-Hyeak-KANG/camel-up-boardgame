@@ -164,6 +164,13 @@ input.code{font-size:28px;letter-spacing:6px;text-align:center;text-transform:up
 .bgm-panel.open{display:block}
 .bgm-panel input[type=range]{width:100%;margin:10px 0;padding:0;background:transparent;accent-color:var(--night)}
 .bgm-panel .btn{width:100%;text-align:center}
+.set-card{padding:12px 16px}
+.set-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.pencil{width:34px;height:34px;border-radius:50%;background:var(--sand-deep);font-size:16px}
+.set-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-top:1px dashed #EAD6A8;font-size:13px;font-weight:700;color:var(--night-soft)}
+.set-row b{color:var(--night);font-weight:900;text-align:right}
+.set-item{margin-bottom:10px}.set-label{font-weight:900;font-size:14px;margin-bottom:6px}
+.set-hint{font-size:11px;font-weight:700;color:var(--night-soft);margin:-4px 0 12px}
 .toggle{display:flex;gap:6px}.toggle button{flex:1;padding:10px;border-radius:12px;background:#EFE3C6}.toggle button.sel{background:var(--night);color:#fff}
 </style>
 </head>
@@ -173,7 +180,7 @@ input.code{font-size:28px;letter-spacing:6px;text-align:center;text-transform:up
 /* =====================================================================
    1. 규칙 설정 — 게임 규칙(GAME_RULES)과 인원별 설정 분리. 하드코딩 금지 영역.
    ===================================================================== */
-const APP_VERSION = 'v14 · 2026-09-14';
+const APP_VERSION = 'v16 · 2026-09-14';
 const GAME_RULES = {
   EDITION: 'Camel Up 2nd Edition (2018)',
   TRACK_LENGTH: 16,
@@ -195,10 +202,9 @@ const GAME_RULES = {
   // ADR-001(사용자 결정): 'start' = 모든 낙타가 출발 구역(0번, 트랙 밖)에 나란히 대기. 겹치지 않음.
   //   출발 구역에서는 스택이 없고, 첫 이동 시 일반 낙타는 1~3번, 미친 낙타는 뒤로 돌아 16~14번으로 진입.
   //   공식 규칙은 'dice'(주사위로 1~3 / 16~14에 미리 배치). 설정 화면에서 전환 가능.
-  SETUP_MODE: 'start',
+  // 시작 위치·구간 종료 시점·플레이 순서·LEG 시작 순서·타이머·파트너십은 판마다 정함 → GAME_SETTING_DEFAULTS 참고
   START_ZONE: 0,                      // 출발 구역 번호
   CRAZY_WRAP: true,                   // 미친 낙타가 출발선을 뒤로 넘으면 16번으로 이어짐 (OPEN-002)
-  RANDOM_TURN_ORDER: true,
   MAX_PLAYERS: 8,                     // 공식 2판: 3~8인
   PARTNERSHIP_MIN_PLAYERS: 6,         // 베팅 파트너십(공식 선택 규칙)은 6인 이상에서만
   TURN_TIMER_SECONDS: 30,             // 턴 타이머 기본값 — 만료 시 강제로 주사위 뽑기(코인 보상 없음)
@@ -206,6 +212,24 @@ const GAME_RULES = {
   TURN_TIMER_START_DELAY: 5,          // 차례 시작 후 이 시간 동안은 타이머가 멈춰 있음(화면 전환·로딩 손해 보정)
   TURN_TIMER_WARN_SECONDS: 10,        // 이 시간 이하부터 빨간색 깜빡임
   TURN_TIMER_GRACE_SECONDS: 5,        // 월드: 차례인 기기가 응답 없으면 이 시간 뒤 다른 기기가 대신 강제 진행
+};
+/** 판마다 정하는 옵션. 방장/로컬 진행자가 정하고 게임 상태(g.settings)에 저장되어 모든 기기에서 같은 값으로 동작 */
+const GAME_SETTING_DEFAULTS = {
+  setupMode: 'start',          // 'start' 출발 구역 나란히 | 'dice' 공식 주사위 배치
+  diceDrawnPerLeg: 6,          // 6 모두 공개 | 5 공식(1개 남김)
+  randomOrder: true,           // 첫 순서 무작위 | 입력/입장 순서
+  legStartOrder: 'sequential', // 2구간부터: 'sequential' 순차 | 'poorest' 코인 최소 플레이어부터
+  timerEnabled: false, timerSeconds: 30,
+  partnershipEnabled: false,   // 6인 이상에서만 실제 적용
+};
+const SETTING_LABELS = {
+  setupMode: ['낙타 시작 위치', {start:'출발 구역(나란히)', dice:'공식(주사위 1~3)'}],
+  diceDrawnPerLeg: ['구간 종료 시점', {6:'주사위 6개 모두', 5:'공식(5개, 1개 남김)'}],
+  randomOrder: ['진행 순서', {true:'무작위', false:'입력/입장 순서'}],
+  legStartOrder: ['LEG 시작 순서 (2구간~)', {sequential:'순차 진행', poorest:'코인 최소 플레이어부터'}],
+  timerEnabled: ['턴 타이머', {true:'켬', false:'끔'}],
+  timerSeconds: ['타이머 시간', {10:'10초',20:'20초',30:'30초',60:'60초'}],
+  partnershipEnabled: ['베팅 파트너십', {true:'켬', false:'끔'}],
 };
 const PLAYER_COUNT_CONFIG = {
   2: { startCoins: 3, finalCardsPerPlayer: 5, spectatorTilesPerPlayer: 1, official: false, note: '공식 규칙은 3~8인. 2인은 비공식 설정(OPEN-001).' },
@@ -232,7 +256,7 @@ const secureRandom = () => (typeof crypto!=='undefined' && crypto.getRandomValue
 const rollDie = rng => GAME_RULES.DIE_FACES[Math.floor(rng()*GAME_RULES.DIE_FACES.length)];
 function shuffle(arr, rng=secureRandom){ const a=[...arr]; for(let i=a.length-1;i>0;i--){ const j=Math.floor(rng()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
 
-function createGame(players, rng = secureRandom) {
+function createGame(players, rng = secureRandom, settings = {}) {
   // players: [{name, clientId?}] — 이미 턴 순서대로 정렬된 상태로 전달
   const cfg = PLAYER_COUNT_CONFIG[players.length];
   if (!cfg) throw new Error('지원하지 않는 인원: ' + players.length);
@@ -245,8 +269,11 @@ function createGame(players, rng = secureRandom) {
     legTickets:Object.fromEntries(GAME_RULES.RACING_CAMELS.map(c=>[c,[...GAME_RULES.LEG_BET_TICKETS]])),
     legBets:[], finalBets:{winner:[],loser:[]}, log:[],
     partnershipEnabled:false, partnerships:[],   // 파트너십: {a,b} 이번 구간 동안 유효
+    settings: { ...GAME_SETTING_DEFAULTS, ...settings },
   };
-  if (GAME_RULES.SETUP_MODE === 'dice') {
+  s.partnershipEnabled = !!s.settings.partnershipEnabled && players.length >= GAME_RULES.PARTNERSHIP_MIN_PLAYERS;
+  s.timerEnabled = !!s.settings.timerEnabled; s.timerSeconds = s.settings.timerSeconds;
+  if (s.settings.setupMode === 'dice') {
     for (const c of GAME_RULES.RACING_CAMELS) place(s, c, rollDie(rng));
     for (const c of GAME_RULES.CRAZY_CAMELS) place(s, c, GAME_RULES.TRACK_LENGTH + 1 - rollDie(rng));
   } else {
@@ -353,7 +380,16 @@ function actionPartnership(s, otherId){
 function endTurn(s){
   const result = { legEnded:false, gameEnded:false, leg:null, final:null };
   if (isFinished(s)) { result.gameEnded = true; result.leg = settleLeg(s); result.final = settleFinal(s); s.status='finished'; return result; }
-  if (s.usedDice.length >= GAME_RULES.DICE_DRAWN_PER_LEG) { result.legEnded = true; result.leg = settleLeg(s); startNextLeg(s); }
+  const perLeg = s.settings?.diceDrawnPerLeg ?? GAME_RULES.DICE_DRAWN_PER_LEG;
+  if (s.usedDice.length >= perLeg) {
+    result.legEnded = true; result.leg = settleLeg(s); startNextLeg(s);
+    if (s.settings?.legStartOrder === 'poorest') {
+      // 코인이 가장 적은 플레이어부터. 동점이면 방금 턴을 마친 사람 다음 순서에 가까운 쪽
+      const from = s.currentPlayerIndex; let best = null;
+      for (let k=1;k<=s.playerCount;k++){ const i=(from+k)%s.playerCount; if (best===null || s.players[i].coins < s.players[best].coins) best=i; }
+      s.currentPlayerIndex = best; return result;
+    }
+  }
   s.currentPlayerIndex = (s.currentPlayerIndex+1) % s.playerCount;
   return result;
 }
@@ -408,8 +444,11 @@ function runEngineTests(){
   s=mk(); s.stacks={10:['black'],8:['red']}; moveCamel(s,'black',2); ok('CASE7 미친 낙타 합류 시 위로', JSON.stringify(s.stacks[8])==='["red","black"]');
   s=mk(); s.stacks={2:['red']}; s.spectatorTiles={4:{owner:1,side:'cheer'}}; moveCamel(s,'red',2); ok('CASE8 응원(OASIS) +1칸, 주인 코인', s.stacks[5]?.[0]==='red' && s.players[1].coins===4);
   s=mk(); s.stacks={2:['red'],3:['blue']}; s.spectatorTiles={4:{owner:1,side:'boo'}}; moveCamel(s,'red',2); ok('CASE9 야유(MIRAGE) -1칸, 아래로', JSON.stringify(s.stacks[3])==='["red","blue"]');
-  s=createGame([{name:'A'},{name:'B'},{name:'C'}],()=>0); for(let i=0;i<GAME_RULES.DICE_DRAWN_PER_LEG-1;i++){ actionDrawDie(s,()=>0); endTurn(s);} const notYet=s.currentLeg===1; actionDrawDie(s,()=>0); endTurn(s);
-    ok(`CASE10 주사위 ${GAME_RULES.DICE_DRAWN_PER_LEG}개째에 구간 종료 (그 전엔 유지)`, notYet && s.currentLeg===2 && s.usedDice.length===0);
+  s=createGame([{name:'A'},{name:'B'},{name:'C'}],()=>0); for(let i=0;i<GAME_SETTING_DEFAULTS.diceDrawnPerLeg-1;i++){ actionDrawDie(s,()=>0); endTurn(s);} const notYet=s.currentLeg===1; actionDrawDie(s,()=>0); endTurn(s);
+    ok(`CASE10 주사위 ${GAME_SETTING_DEFAULTS.diceDrawnPerLeg}개째에 구간 종료 (그 전엔 유지)`, notYet && s.currentLeg===2 && s.usedDice.length===0);
+  s=createGame([{name:'A'},{name:'B'},{name:'C'}],()=>0,{diceDrawnPerLeg:5}); for(let i=0;i<5;i++){ actionDrawDie(s,()=>0); endTurn(s);} ok('CASE25 설정 5개 공개 시 구간 종료', s.currentLeg===2);
+  s=createGame([{name:'A'},{name:'B'},{name:'C'}],()=>0,{legStartOrder:'poorest'}); s.players[0].coins=9; s.players[1].coins=2; s.players[2].coins=5; s.usedDice=[1,2,3,4,5,6]; s.currentPlayerIndex=2; endTurn(s);
+    ok('CASE26 LEG 시작 순서: 코인 최소(B)부터', s.currentPlayerIndex===1 && s.currentLeg===2);
   s=mk(); s.stacks={5:['red'],4:['blue'],1:['green','yellow','purple']}; actionLegBet(s,'red'); s.currentPlayerIndex=1; actionLegBet(s,'blue'); s.currentPlayerIndex=2; actionLegBet(s,'green');
     settleLeg(s); ok('CASE11 구간 베팅 정산 (5 / 1 / -1)', s.players[0].coins===8 && s.players[1].coins===4 && s.players[2].coins===2);
   s=mk(); s.stacks={17:['red'],5:['blue','green'],2:['yellow'],1:['purple']}; actionFinalBet(s,'red','winner'); s.currentPlayerIndex=1; actionFinalBet(s,'red','winner'); s.currentPlayerIndex=2; actionFinalBet(s,'blue','winner');
@@ -421,9 +460,9 @@ function runEngineTests(){
   s=createGame(Array.from({length:6},(_,i)=>({name:'P'+i})),()=>0); s.stacks={5:['red'],1:['blue','green','yellow','purple']}; s.partnershipEnabled=true;
     actionPartnership(s,1); s.currentPlayerIndex=1; actionLegBet(s,'red'); actionLegBet(s,'red'); actionLegBet(s,'blue'); settleLeg(s);
     ok('CASE24 파트너십: 파트너 티켓 중 1장(최고 +5)만 추가, 합산(+8)·손실 아님', s.players[1].coins===3+5+3-1 && s.players[0].coins===8 && s.partnerships.length===1);
-  s=createGame([{name:'A'},{name:'B'}]); ok('CASE21 초기 세팅: 7마리 모두 출발 구역', GAME_RULES.SETUP_MODE!=='start' || s.stacks[0]?.length===7);
-  s=createGame([{name:'A'},{name:'B'}],()=>0); if(GAME_RULES.SETUP_MODE==='start'){ moveCamel(s,'black',2); moveCamel(s,'red',1); }
-    ok('CASE22 출발 구역: 스택 없이 한 마리만 이동, 미친 낙타 2 → 15번', GAME_RULES.SETUP_MODE!=='start' || (s.stacks[15]?.[0]==='black' && s.stacks[1]?.[0]==='red' && s.stacks[0]?.length===5));
+  s=createGame([{name:'A'},{name:'B'}]); ok('CASE21 초기 세팅: 7마리 모두 출발 구역', s.stacks[0]?.length===7);
+  s=createGame([{name:'A'},{name:'B'}],()=>0); moveCamel(s,'black',2); moveCamel(s,'red',1);
+    ok('CASE22 출발 구역: 스택 없이 한 마리만 이동, 미친 낙타 2 → 15번', (s.stacks[15]?.[0]==='black' && s.stacks[1]?.[0]==='red' && s.stacks[0]?.length===5));
   s=mk(); s.stacks={2:['white','blue']}; moveCamel(s,'white',3); ok('CASE23 미친 낙타 출발선 뒤로 넘으면 16번 이어짐 (2→1→16→15)', s.stacks[15]?.join()==='white,blue');
   return T;
 }
@@ -529,31 +568,55 @@ function viewCount(){
   return `<h2>몇 명이 플레이하나요?</h2>
     <div class="row" style="margin-bottom:8px;gap:6px">${[2,3,4,5,6,7,8].map(n=>`<button class="pill ${ui.count===n?'sel':''}" style="font-size:18px;padding:12px 0" onclick="ui.count=${n};render()">${n}</button>`).join('')}</div>
     <p class="sub">${PLAYER_COUNT_CONFIG[ui.count].official?'공식 인원 설정':'⚠️ '+PLAYER_COUNT_CONFIG[ui.count].note}</p>
-    ${timerToggleHtml(ui.timerOpt, ui.timerSecs||GAME_RULES.TURN_TIMER_SECONDS, "ui.timerOpt=!ui.timerOpt;render()", "ui.timerSecs=VAL;render()")}
-    ${partnershipToggleHtml(!!ui.partnerOpt, "ui.partnerOpt=!ui.partnerOpt;render()", ui.count<GAME_RULES.PARTNERSHIP_MIN_PLAYERS, ui.count<GAME_RULES.PARTNERSHIP_MIN_PLAYERS?' · 인원이 부족해요':'')}
+    ${settingsCardHtml(ui.localSettings, ui.count, true, 'openLocalSettings()')}
     <button class="btn center" onclick="ui.names=Array.from({length:ui.count},(_,i)=>ui.names[i]||'');go('names')">다음</button>
     <button class="btn ghost" onclick="go('home')">← 메인으로</button>`;
 }
 function viewNames(){
-  return `<h2>이름을 입력하세요</h2><p class="sub">플레이 순서는 시작할 때 무작위로 정해져요.</p>
+  return `<h2>이름을 입력하세요</h2><p class="sub">${ui.localSettings.randomOrder?'플레이 순서는 시작할 때 무작위로 정해져요.':'입력한 순서대로 플레이해요.'}</p>
     ${ui.names.map((n,i)=>`<input placeholder="플레이어 ${i+1}" value="${esc(n)}" maxlength="10" oninput="ui.names[${i}]=this.value">`).join('')}
     <button class="btn center" onclick="startLocalGame()">게임 시작 🎲</button>
     <button class="btn ghost" onclick="go('count')">← 인원 변경</button>`;
 }
-function timerToggleHtml(on, secs, onToggle, onPick, disabled=false){
-  return `<div class="card" style="padding:12px 16px"><div style="display:flex;justify-content:space-between;align-items:center"><div><b>⏱ 턴 타이머</b><div style="font-size:12px;font-weight:700;color:var(--night-soft)">시간 안에 행동하지 않으면 자동으로 주사위만 굴려요 (코인 없음)</div></div>
-    <button class="pill ${on?'sel':''}" style="flex:0 0 74px;padding:10px 0;font-size:15px" ${disabled?'disabled':''} onclick="${onToggle}">${on?'켬':'끔'}</button></div>
-    ${on?`<div class="toggle" style="margin-top:10px">${GAME_RULES.TURN_TIMER_OPTIONS.map(v=>`<button class="${secs===v?'sel':''}" ${disabled?'disabled':''} onclick="${onPick.replace('VAL',v)}">${v}초</button>`).join('')}</div>
-    <div style="font-size:11px;font-weight:700;color:var(--night-soft);margin-top:6px">차례가 시작되면 ${GAME_RULES.TURN_TIMER_START_DELAY}초 대기 후 카운트가 시작돼요</div>`:''}</div>`;
+/** 설정 카드(조회용) — 우측 상단 연필로 모달 열기 */
+function settingsCardHtml(st, playerCount, canEdit, onEdit){
+  const row=(k,extra='')=>`<div class="set-row"><span>${SETTING_LABELS[k][0]}</span><b>${SETTING_LABELS[k][1][String(st[k])]}${extra}</b></div>`;
+  const partnerNote = playerCount<GAME_RULES.PARTNERSHIP_MIN_PLAYERS ? ` <span class="tag">${playerCount}명 · 미적용</span>` : '';
+  return `<div class="card set-card"><div class="set-head"><b>⚙️ 게임 설정</b>${canEdit?`<button class="pencil" onclick="${onEdit}" title="설정 수정">✏️</button>`:''}</div>
+    ${row('setupMode')}${row('diceDrawnPerLeg')}${row('randomOrder')}${row('legStartOrder')}
+    ${row('timerEnabled', st.timerEnabled?` · ${st.timerSeconds}초`:'')}${row('partnershipEnabled', partnerNote)}</div>`;
 }
-function partnershipToggleHtml(on, onToggle, disabled=false, note=''){
-  return `<div class="card" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px"><div><b>🤝 베팅 파트너십</b> <button class="tipbtn" style="width:26px;height:26px;font-size:14px;vertical-align:middle" onclick="showTip('partnership')">?</button><div style="font-size:12px;font-weight:700;color:var(--night-soft)">공식 선택 규칙 · ${GAME_RULES.PARTNERSHIP_MIN_PLAYERS}명 이상일 때만 적용${note}</div></div>
-    <button class="pill ${on?'sel':''}" style="flex:0 0 74px;padding:10px 0;font-size:15px" ${disabled?'disabled':''} onclick="${onToggle}">${on?'켬':'끔'}</button></div>`;
+/** 설정 선택 모달. draft를 편집하고 저장 시 onSave(draft) */
+function openSettingsModal(current, playerCount, onSave){
+  ui.settingsDraft = { ...current }; ui.settingsSave = onSave; ui.settingsPlayers = playerCount; renderSettingsModal();
 }
+function renderSettingsModal(){
+  const d=ui.settingsDraft, n=ui.settingsPlayers;
+  const seg=(k,opts)=>`<div class="set-item"><div class="set-label">${SETTING_LABELS[k][0]}</div><div class="toggle">${opts.map(([v,label,dis])=>`<button class="${String(d[k])===String(v)?'sel':''}" ${dis?'disabled':''} onclick="setDraft('${k}',${typeof v==='string'?`'${v}'`:v})">${label}</button>`).join('')}</div></div>`;
+  const few = n<GAME_RULES.PARTNERSHIP_MIN_PLAYERS;
+  ui.overlay=`<div class="overlay" onclick="ui.overlay=null;render()"><div class="sheet tip" onclick="event.stopPropagation()"><h3>⚙️ 게임 설정</h3><div class="tipbody">
+    ${seg('setupMode',[['start','출발 구역(나란히)'],['dice','공식(주사위 1~3)']])}
+    ${seg('diceDrawnPerLeg',[[6,'주사위 6개 모두'],[5,'공식(5개, 1개 남김)']])}
+    ${seg('randomOrder',[[true,'무작위'],[false,'입력/입장 순서']])}
+    ${seg('legStartOrder',[['sequential','순차 진행'],['poorest','코인 최소부터']])}
+    <div class="set-hint">진행 순서는 게임 시작 때 한 번 정해지고 끝까지 그 방향으로 돌아요. LEG 1은 모두 코인이 같으니 정해진 순서대로 시작하고, '코인 최소부터'는 LEG 2부터 코인이 가장 적은 사람이 첫 턴을 잡되 이후 순서는 원래 방향 그대로예요.</div>
+    ${seg('timerEnabled',[[true,'켬'],[false,'끔']])}
+    ${d.timerEnabled?seg('timerSeconds',GAME_RULES.TURN_TIMER_OPTIONS.map(v=>[v,v+'초'])):''}
+    <div class="set-hint">시간 안에 행동하지 않으면 자동으로 주사위만 굴려요(코인 없음). 차례 시작 후 ${GAME_RULES.TURN_TIMER_START_DELAY}초 대기 뒤 카운트.</div>
+    <div class="set-item"><div class="set-label">베팅 파트너십 <button class="tipbtn" style="width:24px;height:24px;font-size:13px;vertical-align:middle" onclick="showTip('partnership')">?</button></div>
+      <div class="toggle"><button class="${d.partnershipEnabled?'sel':''}" ${few?'disabled':''} onclick="setDraft('partnershipEnabled',true)">켬</button><button class="${!d.partnershipEnabled?'sel':''}" ${few?'disabled':''} onclick="setDraft('partnershipEnabled',false)">끔</button></div></div>
+    <div class="set-hint">${few?`공식 선택 규칙 · ${GAME_RULES.PARTNERSHIP_MIN_PLAYERS}명 이상일 때만 선택할 수 있어요 (지금 ${n}명)`:'공식 선택 규칙 · 6명 이상'}</div>
+  </div><div class="row"><button class="btn light center" onclick="ui.overlay=null;render()">취소</button><button class="btn center" onclick="saveSettingsDraft()">저장</button></div></div></div>`;
+  render();
+}
+window.setDraft = (k,v)=>{ ui.settingsDraft[k]=v; renderSettingsModal(); };
+window.saveSettingsDraft = ()=>{ const fn=ui.settingsSave, d=ui.settingsDraft; ui.overlay=null; fn(d); };
+ui.localSettings = { ...GAME_SETTING_DEFAULTS };
+window.openLocalSettings = ()=> openSettingsModal(ui.localSettings, ui.count, d=>{ ui.localSettings=d; render(); });
 window.startLocalGame = ()=>{
   let players = ui.names.map((n,i)=>({name:n.trim()||`플레이어 ${i+1}`}));
-  if (GAME_RULES.RANDOM_TURN_ORDER) players = shuffle(players);
-  ui.game = createGame(players); ui.game.gameId='L-'+Date.now(); ui.game.partnershipEnabled = !!ui.partnerOpt && players.length>=GAME_RULES.PARTNERSHIP_MIN_PLAYERS; ui.game.timerEnabled=!!ui.timerOpt; ui.game.timerSeconds=ui.timerSecs||GAME_RULES.TURN_TIMER_SECONDS; ui.pendingResult=null; ui.picking=null; ui.camelXY=null;
+  if (ui.localSettings.randomOrder) players = shuffle(players);
+  ui.game = createGame(players, undefined, ui.localSettings); ui.game.gameId='L-'+Date.now(); ui.pendingResult=null; ui.picking=null; ui.camelXY=null;
   ui.overlay = orderOverlay(ui.game, "ui.overlay=null;go('pass')"); ui.screen='game'; render();
 };
 /* 오버레이 큐: 순서 → 구간 종료 → 내 차례 처럼 여러 안내가 겹칠 때 하나씩 보여준다 */
@@ -586,7 +649,7 @@ function eventOverlay(html, next='nextOverlay()'){
 function orderOverlay(g, next){
   return `<div class="overlay"><div class="sheet"><h3>🎲 플레이 순서가 정해졌어요</h3>
     ${g.players.map((p,i)=>`<div class="lobby-row"><span>${i+1}번째 · ${esc(p.name)}</span><span class="coin">💰 ${p.coins}</span></div>`).join('')}
-    <p style="margin-top:10px">${GAME_RULES.SETUP_MODE==='start'?'모든 낙타는 출발 구역에서 나란히 시작해요. 일반 낙타는 1번 칸부터 앞으로, 미친 낙타는 16번 칸부터 뒤로 달려요.':'낙타는 주사위 값 칸에서 시작해요.'}</p>
+    <p style="margin-top:10px">${g.settings.setupMode==='start'?'모든 낙타는 출발 구역에서 나란히 시작해요. 일반 낙타는 1번 칸부터 앞으로, 미친 낙타는 16번 칸부터 뒤로 달려요.':'낙타는 주사위 값 칸에서 시작해요.'}</p>
     <button class="btn center" onclick="${next}">시작!</button></div></div>`;
 }
 function viewPass(){
@@ -797,21 +860,14 @@ function viewSettings(){
   const pc = Object.entries(PLAYER_COUNT_CONFIG).map(([n,c])=>`<div class="testline">${n}인 · 시작 ${c.startCoins}코인 · 최종카드 ${c.finalCardsPerPlayer} · 타일 ${c.spectatorTilesPerPlayer} ${c.official?'':'· <span class="bad">비공식</span>'}</div>`).join('');
   const tests = ui.tests ? `<div class="card"><b>엔진 테스트 ${ui.tests.filter(t=>t.ok).length}/${ui.tests.length} 통과</b>${ui.tests.map(t=>`<div class="testline ${t.ok?'ok':'bad'}">${t.ok?'✓':'✗'} ${t.n}</div>`).join('')}</div>` : '';
   return `<h2>설정</h2><p class="sub"><span class="tag">${APP_VERSION}</span></p>
-    <div class="card"><b>낙타 시작 위치</b><div style="height:8px"></div><div class="toggle">
-      <button class="${GAME_RULES.SETUP_MODE==='start'?'sel':''}" onclick="GAME_RULES.SETUP_MODE='start';render()">출발 구역(나란히)</button>
-      <button class="${GAME_RULES.SETUP_MODE==='dice'?'sel':''}" onclick="GAME_RULES.SETUP_MODE='dice';render()">공식(주사위 1~3)</button></div></div>
-    <div class="card"><b>구간 종료 시점</b><div style="height:8px"></div><div class="toggle">
-      <button class="${GAME_RULES.DICE_DRAWN_PER_LEG===6?'sel':''}" onclick="GAME_RULES.DICE_DRAWN_PER_LEG=6;render()">주사위 6개 모두</button>
-      <button class="${GAME_RULES.DICE_DRAWN_PER_LEG===5?'sel':''}" onclick="GAME_RULES.DICE_DRAWN_PER_LEG=5;render()">공식(5개, 1개 남김)</button></div></div>
-    <div class="card"><b>플레이 순서</b><div style="height:8px"></div><div class="toggle">
-      <button class="${GAME_RULES.RANDOM_TURN_ORDER?'sel':''}" onclick="GAME_RULES.RANDOM_TURN_ORDER=true;render()">무작위</button>
-      <button class="${!GAME_RULES.RANDOM_TURN_ORDER?'sel':''}" onclick="GAME_RULES.RANDOM_TURN_ORDER=false;render()">입력/입장 순서</button></div></div>
-    <button class="btn center" onclick="ui.tests=runEngineTests();render()">🧪 엔진 테스트 실행 (CASE 1~24)</button>${tests}
+    <div class="card"><b>게임 설정은 어디서?</b><p style="font-weight:600;font-size:13px;line-height:1.5;margin-top:6px">낙타 시작 위치·구간 종료 시점·플레이 순서·LEG 시작 순서·타이머·파트너십은 판마다 정해요. 로컬은 <b>인원 선택 화면</b>, 월드는 <b>방 대기실</b>의 ⚙️ 게임 설정 카드에서 ✏️를 누르세요. 월드에서는 방장이 정한 값이 모든 기기에 똑같이 적용됩니다.</p></div>
+    <button class="btn center" onclick="ui.tests=runEngineTests();render()">🧪 엔진 테스트 실행 (CASE 1~26)</button>${tests}
     <div class="card"><b>인원별 설정 (PLAYER_COUNT_CONFIG)</b>${pc}</div>
     <div class="card"><b>게임 규칙 값 (GAME_RULES)</b><div style="font-size:12px;word-break:break-all">${rules}</div></div>
     <div class="card"><b>확인 필요 (questions/OPEN) · 결정(ADR)</b>
       <div class="testline">ADR-001 시작 위치: 출발 구역에 7마리 나란히(스택 없음). 일반 낙타는 1번부터, 미친 낙타는 16번부터 뒤로. 공식은 주사위 배치.</div>
-      <div class="testline">ADR-003 구간 종료: 주사위 6개 모두 공개 시. 공식 2판은 5개 공개 후 종료(1개는 피라미드에 남음).</div>
+      <div class="testline">ADR-003 구간 종료: 기본 주사위 6개 모두 공개 시. 공식 2판은 5개 공개 후 종료(1개는 피라미드에 남음). 판마다 선택.</div>
+      <div class="testline">ADR-005 LEG 시작 순서(2구간~): 순차(기본) 또는 코인 최소 플레이어부터. 동점이면 직전 턴 다음 순서에 가까운 쪽. 게임 설정은 게임 상태에 저장되어 모든 기기 동일.</div>
       <div class="testline">OPEN-001 2인 플레이 밸런스 — 공식 3~8인. 현재 3인 설정 그대로 사용. 7·8인은 공식 인원으로 추가(수치 변화 없음).</div>
       <div class="testline">ADR-004 베팅 파트너십(6인+ 선택 규칙): 구간 정산 때 파트너의 구간 베팅 티켓 1장의 보상을 추가로 받음(양쪽 모두). 앱은 보상이 가장 큰 티켓을 자동 선택, 0 이하면 받지 않음.</div>
       <div class="testline">ADR-002 미친 낙타가 1번 칸을 지나 뒤로 가면 16번으로 이어짐(CRAZY_WRAP). 업힌 일반 낙타도 함께 16번으로 감 — 이 경우 결승 통과로 보지 않음.</div>
@@ -908,7 +964,7 @@ const nameOrAsk = ()=>{ const n=ui.myName.trim(); if(!n){ ui.err='먼저 내 이
 window.createRoom = async ()=>{
   const name=nameOrAsk(); if(!name) return; await getClientId();
   const code = Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random()*32)]).join('');
-  const room = { code, hostId:ui.clientId, status:'lobby', players:[{clientId:ui.clientId,name,ready:true}], game:null, version:0, lastEvent:'', chat:[] };
+  const room = { code, hostId:ui.clientId, status:'lobby', players:[{clientId:ui.clientId,name,ready:true}], game:null, version:0, lastEvent:'', chat:[], settings:{...GAME_SETTING_DEFAULTS} };
   try { await saveRoom(room); await saveMe(); ui.screen='lobby'; startPoll(); render(); } catch(e){ ui.err='방 생성 실패: '+e.message; render(); }
 };
 window.joinRoom = async ()=>{
@@ -927,23 +983,20 @@ function viewLobby(){
   const r=ui.room, isHost=r.hostId===ui.clientId, me=r.players.find(p=>p.clientId===ui.clientId), allReady=r.players.every(p=>p.ready);
   return `<h2>방 대기실</h2><p class="sub">이 코드를 친구에게 공유하세요</p><div class="codebox">${esc(r.code)}</div>
     <div class="sync"><span class="sync-text"></span></div>
-    ${timerToggleHtml(!!r.timerEnabled, r.timerSeconds||GAME_RULES.TURN_TIMER_SECONDS, 'toggleTimer()', 'pickTimer(VAL)', !isHost)}
-    ${partnershipToggleHtml(!!r.partnershipEnabled, 'togglePartnership()', !isHost || r.players.length<GAME_RULES.PARTNERSHIP_MIN_PLAYERS, r.players.length<GAME_RULES.PARTNERSHIP_MIN_PLAYERS?` · 지금 ${r.players.length}명이라 선택 불가`:'')}
+    ${settingsCardHtml(r.settings||GAME_SETTING_DEFAULTS, r.players.length, isHost, 'openWorldSettings()')}
     <div class="card">${r.players.map((p,i)=>`<div class="lobby-row"><span>${p.clientId===r.hostId?'👑 ':''}${esc(p.name)}${p.clientId===ui.clientId?' (나)':''}</span><span>${p.ready?'✅ 준비':'⏳ 대기'}</span></div>`).join('')}
-      <p style="font-size:13px;font-weight:700;color:var(--night-soft);margin-top:8px">${r.players.length}/${GAME_RULES.MAX_PLAYERS}명 · 순서는 시작 시 무작위</p></div>
+      <p style="font-size:13px;font-weight:700;color:var(--night-soft);margin-top:8px">${r.players.length}/${GAME_RULES.MAX_PLAYERS}명 · 설정은 방장만 바꿀 수 있어요</p></div>
     ${me&&!isHost?`<button class="btn ${me.ready?'light':''} center" onclick="toggleReady()">${me.ready?'준비 취소':'준비 완료 ✅'}</button>`:''}
     ${isHost?`<button class="btn center" ${r.players.length>=2&&allReady?'':'disabled'} onclick="hostStart()">게임 시작 🎲 ${r.players.length<2?'(2명 이상 필요)':allReady?'':'(모두 준비 대기)'}</button>`:'<p class="sub">방장이 시작하면 자동으로 게임 화면으로 넘어가요.</p>'}
     <button class="btn ghost" onclick="leaveRoom()">방 나가기</button>`;
 }
 window.toggleReady = async ()=>{ const okk=await commit(r=>{ const p=r.players.find(p=>p.clientId===ui.clientId); p.ready=!p.ready; }); if(!okk) ui.err='다른 갱신이 있어 다시 불러왔어요. 한 번 더 눌러주세요.'; render(); };
-window.pickTimer = async v=>{ const okk=await commit(r=>{ r.timerSeconds=v; }); if(!okk) ui.err='다른 갱신이 있어 다시 불러왔어요. 한 번 더 눌러주세요.'; render(); };
-window.togglePartnership = async ()=>{ const okk=await commit(r=>{ r.partnershipEnabled=!r.partnershipEnabled; }); if(!okk) ui.err='다른 갱신이 있어 다시 불러왔어요. 한 번 더 눌러주세요.'; render(); };
-window.toggleTimer = async ()=>{ const okk=await commit(r=>{ r.timerEnabled=!r.timerEnabled; }); if(!okk) ui.err='다른 갱신이 있어 다시 불러왔어요. 한 번 더 눌러주세요.'; render(); };
+window.openWorldSettings = ()=> openSettingsModal(ui.room.settings||GAME_SETTING_DEFAULTS, ui.room.players.length, async d=>{ await commit(r=>{ r.settings=d; }); render(); });
 window.hostStart = async ()=>{
   const okk = await commit(r=>{
     let ps = r.players.map(p=>({name:p.name, clientId:p.clientId}));
-    if (GAME_RULES.RANDOM_TURN_ORDER) ps = shuffle(ps);
-    r.game = createGame(ps); r.game.gameId=r.code+'-'+Date.now(); r.game.partnershipEnabled = !!r.partnershipEnabled && ps.length>=GAME_RULES.PARTNERSHIP_MIN_PLAYERS; r.game.timerEnabled=!!r.timerEnabled; r.game.timerSeconds=r.timerSeconds||GAME_RULES.TURN_TIMER_SECONDS; r.game.turnStartedAt=Date.now(); r.status='playing'; r.lastEvent=''; r.legNotice=null;
+    const st = r.settings||GAME_SETTING_DEFAULTS; if (st.randomOrder) ps = shuffle(ps);
+    r.game = createGame(ps, undefined, st); r.game.gameId=r.code+'-'+Date.now(); r.game.turnStartedAt=Date.now(); r.status='playing'; r.lastEvent=''; r.legNotice=null;
   });
   if (okk) applyRoom(ui.room); else ui.err='다른 갱신이 있어 다시 불러왔어요. 한 번 더 눌러주세요.';
   render();
